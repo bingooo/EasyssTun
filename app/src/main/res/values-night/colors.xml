@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="app_color">#525A87</color>
+    <color name="button_enable">#CECECE</color>
+    <color name="button_disable">#FFFFFF</color>
+
+</resources>

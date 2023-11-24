@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">EasyssTun</string>
+    <string name="easyss_server">Easyss 服务器地址</string>
+    <string name="easyss_serverport">Easyss 服务器端口</string>
+    <string name="easyss_password">Easyss 客户端密码</string>
+    <string name="service_enable">开启</string>
+    <string name="service_disable">停止</string>
+    <string name="service_running">EasyssTun 服务运行中</string>
+    <string name="service_stopped">EasyssTun 已停止</string>
+    <string name="skipped_app_list">已配置跳过 %s 个应用</string>
+    <string name="delay_test_result">延迟测试: %s</string>
+    <string name="delay_test_fail">失败，请检查配置</string>
+    <string name="choose_app_to_bypass">点按配置跳过的应用</string>
+    <string name="easyss_configure">配置</string>
+    <string name="speedtest_placeholder">延迟测试</string>
+    <string name="speedtest_summary">点按进行延迟测试</string>
+    <string name="applist_title">选择跳过的应用</string>
+    <string name="log_title">Easyss 日志</string>
+    <string name="easyss_configure_title">Easyss 配置</string>
+    <string name="route_desc">默认情况下，EasysTun 将会跳过局域网地址以及本应用的流量。 同时以上选中的应用也会跳过。\n\n除以上情况外的流量将由 Easyss 接管。</string>
+    <string name="app_name_placeholder">应用名</string>
+    <string name="easyss_need_config">Easyss 服务未配置</string>
+    <string name="easyss_encryption">Easyss 加密方式</string>
+    <string name="easyss_proxyrule">Easyss 代理方式</string>
+    <string name="easyss_outbound">Easyss 出口协议</string>
+    <string name="easyss_loglevel">Easyss 日志级别</string>
+    <string name="easyss_custom_ca">Easyss 自定义证书</string>
+    <string name="not_set">未配置</string>
+</resources>

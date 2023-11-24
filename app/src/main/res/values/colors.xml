@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="app_color">#FFBB86FC</color>
+    <color name="button_enable">#3F51B5</color>
+    <color name="button_disable">#29305A</color>
+
+
+    <color name="white">#FFFFFFFF</color>
+
+
+</resources>

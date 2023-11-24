@@ -1,0 +1,77 @@
+package com.musan.easysstun
+
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import android.Manifest
+import android.content.pm.PackageInfo
+import android.widget.ProgressBar
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+class AppListFragment : Fragment() {
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var adapter: AppListAdapter
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        val view = inflater.inflate(R.layout.fragment_app_list, container, false)
+        recyclerView = view.findViewById(R.id.recyclerView)
+        recyclerView.layoutManager = LinearLayoutManager(requireContext())
+
+        adapter = AppListAdapter(requireContext(), lifecycleScope)
+        recyclerView.recycledViewPool.setMaxRecycledViews(0, 100)
+        recyclerView.adapter = adapter
+
+        lifecycleScope.launch {
+            var progressBar = view.findViewById<ProgressBar>(R.id.progressBar)
+            progressBar.visibility = View.VISIBLE
+            val appList = withContext(Dispatchers.IO) {
+                getInstalledApps()
+            }
+            adapter.setAppList(appList)
+            progressBar.visibility = View.GONE
+        }
+        return view
+    }
+
+    private fun getInstalledApps(): List<PackageInfo> {
+        val pm = requireContext().packageManager
+
+        val packages = pm.getInstalledPackages(
+            PackageManager.MATCH_UNINSTALLED_PACKAGES
+                    or PackageManager.GET_PERMISSIONS
+                    or PackageManager.GET_PROVIDERS
+                    or PackageManager.GET_META_DATA
+        )
+
+        var pref = Pref(requireContext())
+        val selectedApps = pref.getApps()
+
+        var appList = packages
+            .filter { packageInfo ->
+                (packageInfo.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) == 0 &&
+                        packageInfo.requestedPermissions?.contains(Manifest.permission.INTERNET) == true &&
+                        packageInfo.packageName != requireActivity().applicationContext.packageName
+            }
+
+        appList =  appList.sortedWith(
+            compareBy<PackageInfo>{
+                selectedApps?.contains(it.packageName) !=true }
+                .thenBy { it.packageName }
+        )
+
+        return appList
+    }
+}

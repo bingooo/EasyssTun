@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    app:startDestination="@id/MainFragment">
+
+    <fragment
+        android:id="@+id/SettingsFragment"
+        android:name="com.musan.easysstun.SettingsFragment"
+        android:label="@string/easyss_configure_title">
+        <action
+            android:id="@+id/action_nav_setting_to_applist"
+            app:destination="@+id/AppListFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/AppListFragment"
+        android:name="com.musan.easysstun.AppListFragment"
+        android:label="@string/applist_title">
+    </fragment>
+
+    <fragment
+        android:id="@+id/LogFragment"
+        android:name="com.musan.easysstun.LogFragment"
+        android:label="@string/log_title">
+    </fragment>
+
+    <fragment
+        android:id="@+id/MainFragment"
+        android:name="com.musan.easysstun.MainFragment"
+        android:label="@string/app_name">
+        <action
+            android:id="@+id/action_main_to_setting"
+            app:destination="@+id/SettingsFragment" />
+
+        <action
+            android:id="@+id/action_main_to_applist"
+            app:destination="@+id/AppListFragment" />
+
+        <action
+            android:id="@+id/action_main_to_log"
+            app:destination="@+id/LogFragment" />
+    </fragment>
+
+</navigation>
