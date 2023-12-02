@@ -85,9 +85,12 @@ class TProxyService : VpnService() {
         /* VPN */
         var session = String()
         val builder: Builder = Builder()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            builder.setMetered(false)
+        }
         builder.setBlocking(false)
         builder.setMtu(8500)
-
 
         builder.addAddress("198.18.0.1", 32)
         builder.addDnsServer("223.6.6.6")
