@@ -196,5 +196,14 @@
         <item>warn</item>
         <item>error</item>
     </string-array>
+    <string-array name="tunmode_list">
+        <item>heiher/hev-socks5-tunnel</item>
+        <item>xjasonlyu/tun2socks</item>
+    </string-array>
+
+    <string-array name="tunmode_list_value">
+        <item>heiher/hev-socks5-tunnel</item>
+        <item>xjasonlyu/tun2socks</item>
+    </string-array>
 
 </resources>

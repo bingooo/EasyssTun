@@ -29,4 +29,5 @@
     <string name="easyss_loglevel">Easyss Log Level</string>
     <string name="easyss_custom_ca">Easyss Custom CA</string>
     <string name="not_set">Not Set</string>
+    <string name="tunmode">TUN</string>
 </resources>

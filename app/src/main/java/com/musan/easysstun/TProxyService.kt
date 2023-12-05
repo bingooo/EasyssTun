@@ -8,22 +8,26 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.net.LocalSocket
+import android.net.LocalSocketAddress
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.edit
+import engine.Key
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.File
+import java.io.FileDescriptor
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStreamReader
-
 
 class TProxyService : VpnService() {
     private var tunFd: ParcelFileDescriptor? = null
@@ -77,7 +81,7 @@ class TProxyService : VpnService() {
 
         pref = Pref(this)
         var easyssInfo = pref.getEasyssInfo()
-        if (!easyssInfo.valid){
+        if (!easyssInfo.valid) {
             pref.isServiceEnabled = false
             return
         }
@@ -99,8 +103,6 @@ class TProxyService : VpnService() {
             val parts = it.split('/', limit = 2)
             builder.addRoute(parts[0], parts[1].toInt())
         }
-//        builder.addRoute("0.0.0.0", 0)
-//        builder.addRoute("198.18.0.2", 32)
         session += "IPv4"
 
 //        if (prefs.getIpv6()) {
@@ -128,7 +130,7 @@ class TProxyService : VpnService() {
         } catch (e: PackageManager.NameNotFoundException) {
         }
 
-        //test
+        // debug wechat
 //        builder.addAllowedApplication("com.tencent.mm")
 
         builder.setSession(session)
@@ -158,59 +160,141 @@ class TProxyService : VpnService() {
                         }
                     }
 
-//                    while (isActive) {
-//                        if (bufferedReader.ready()) {
-//                            val line = bufferedReader.readLine()
-//                            if (line != null) {
-//                                Log.i("easyss", line)
-//                            }
-//                        } else {
-//                            delay(100)
-//                        }
-//                    }
                 } catch (e: IOException) {
                     Log.e("easyss", "msg=[EasyssTun] IOException: " + e.message)
                 } catch (e: InterruptedException) {
                     Log.e("easyss", "msg=[EasyssTun] InterruptedException: " + e.message)
-                }
-
-                finally {
+                } finally {
                     process.destroy()
                     val exitCode = process.waitFor()
                     Log.i("easyss", "msg=[EasyssTun] Command exited with code: $exitCode")
                     break
                 }
-
             }
         }
 
+        var tun = pref.prefs.getString("tunmode", "heiher/hev-socks5-tunnel")
+        var loglevel = pref.prefs.getString("easyss_loglevel", "info")
+        when (tun) {
+            "heiher/hev-socks5-tunnel" -> {
+                /* TProxy */
+                val tproxy_file = File(cacheDir, "tproxy.conf")
+                try {
+                    tproxy_file.createNewFile()
 
-
-        /* TProxy */
-        val tproxy_file = File(cacheDir, "tproxy.conf")
-        try {
-            tproxy_file.createNewFile()
-            val fos = FileOutputStream(tproxy_file, false)
-            var tproxy_conf = """misc:
+                    var logfile = File(cacheDir, "tproxy.log")
+                    logfile.createNewFile()
+                    val fos = FileOutputStream(tproxy_file, false)
+                    var tproxy_conf = """misc:
   task-stack-size: 20480
+  connect-timeout: 5000
+  limit-nofile: 65535
+  read-write-timeout: 60000
+  log-file: ${logfile.absolutePath}
+  log-level: ${loglevel}
 tunnel:
   mtu: 8500
 """
-            tproxy_conf += """socks5:
+                    tproxy_conf += """socks5:
   port: ${pref.prefs.getString("socks_port", "2080")?.toInt()}
   address: '127.0.0.1'
   udp: 'udp'
 """
-            fos.write(tproxy_conf.toByteArray())
-            fos.close()
-        } catch (e: IOException) {
-            return
+                    fos.write(tproxy_conf.toByteArray())
+                    fos.close()
+                } catch (e: IOException) {
+                    return
+                }
+                TProxyStartService(tproxy_file.absolutePath, tunFd!!.fd)
+                pref.prefs.edit { apply { putBoolean("enable", true) } }
+                val channelName = "easysstun"
+                initNotificationChannel(channelName)
+                createNotification(channelName)
+            }
+
+            "xjasonlyu/tun2socks" -> {
+                /* xjasonlyu/tun2socks */
+                /* issue #123 */
+                val key: engine.Key = Key()
+                key.setMark(0)
+                key.setMTU(0)
+                key.setDevice("fd://" + tunFd!!.getFd())
+                key.setInterface("")
+                key.setLogLevel(loglevel)
+                key.setProxy("socks5://127.0.0.1:2080")
+                key.setRestAPI("")
+                key.setTCPSendBufferSize("")
+                key.setTCPReceiveBufferSize("")
+                key.setTCPModerateReceiveBuffer(false)
+                engine.Engine.insert(key)
+                engine.Engine.start()
+            }
+
+            else -> {
+//                /* Tun2proxy */
+//                /* Issue #7 */
+//                val proxyUrl = "socks5://127.0.0.1:2080"
+//                val ptunFd = tunFd!!.fd
+//                val tunMtu = 8500
+//                val verbose = false
+//                val dnsOverTcp = false
+//
+//                var sScope = CoroutineScope(Dispatchers.Default)
+//                sScope.launch {
+//                    Tun2proxy.run(proxyUrl, ptunFd, tunMtu, verbose, dnsOverTcp)
+//                }
+//
+//                /* BadVPN */
+//                /* so file from ssrDroid */
+//                var sScope = CoroutineScope(Dispatchers.Default)
+//                sScope.launch {
+//                    val sfile = File(cacheDir, "sock_path")
+//                    sfile.createNewFile()
+//                    val cmd = listOf<String>(
+//                        applicationInfo.nativeLibraryDir.toString() + "/libtun2socks_bad.so",
+//                        "--netif-ipaddr", "198.18.0.2",
+//                        "--netif-netmask", "255.255.255.0",
+//                        "--socks-server-addr", "127.0.0.1:2080",
+//                        "--tunmtu", "8500",
+//                        "--dnsgw", "198.18.0.1",
+//                        "--tunfd", tunFd!!.fd.toString(),
+//                        "--sock", sfile.absolutePath,
+//                        "--loglevel", "3"
+//                    )
+//                    println(cmd.toString())
+//                    try {
+//                        val processBuilder = ProcessBuilder(cmd)
+//                        var process = processBuilder.start()
+//
+//                        var tries = 0
+//                        while (true) try {
+//                            delay(50L shl tries)
+//                            LocalSocket().use { localSocket ->
+//                                localSocket.connect(
+//                                    LocalSocketAddress(
+//                                        sfile.absolutePath,
+//                                        LocalSocketAddress.Namespace.FILESYSTEM
+//                                    )
+//                                )
+//                                localSocket.setFileDescriptorsForSend(arrayOf(tunFd!!.fileDescriptor))
+//                                localSocket.outputStream.write(42)
+//                            }
+//                            continue
+//                        } catch (e: IOException) {
+//                            println(e.message)
+//                            if (tries > 5) throw e
+//                            tries += 1
+//                        }
+//                    } catch (e: IOException) {
+//                        Log.e("sc", "msg=[sc] IOException: " + e.message)
+//                    } catch (e: InterruptedException) {
+//                        Log.e("sc", "msg=[sc] InterruptedException: " + e.message)
+//                    }
+//                }
+
+            }
+
         }
-        TProxyStartService(tproxy_file.absolutePath, tunFd!!.fd)
-        pref.prefs.edit { apply { putBoolean("enable", true) } }
-        val channelName = "easysstun"
-        initNotificationChannel(channelName)
-        createNotification(channelName)
     }
 
     fun stopService() {
@@ -224,11 +308,8 @@ tunnel:
             Log.e("TProxyStopService", e.message.toString())
         }
         try {
-
             process.destroy()
             processEasyJob.cancel()
-//            val exitCode = process.waitFor()
-//            Log.i("easyss", "msg=[EasyssTun] Command exited with code: $exitCode")
         } catch (e: Exception) {
             Log.e("easyJob", e.message.toString())
         }
@@ -274,6 +355,7 @@ tunnel:
     companion object {
         @JvmStatic
         private external fun TProxyStartService(config_path: String, fd: Int)
+
         @JvmStatic
         private external fun TProxyStopService()
 

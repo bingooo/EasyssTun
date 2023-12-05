@@ -65,6 +65,13 @@
             android:defaultValue="info"
             app:useSimpleSummaryProvider="true"/>
 
-
+        <DropDownPreference
+            app:icon="@drawable/linked_services_24px"
+            android:key="tunmode"
+            android:title="@string/tunmode"
+            android:entries="@array/tunmode_list"
+            android:entryValues="@array/tunmode_list_value"
+            android:defaultValue="heiher/hev-socks5-tunnel"
+            app:useSimpleSummaryProvider="true"/>
 
 </PreferenceScreen>
