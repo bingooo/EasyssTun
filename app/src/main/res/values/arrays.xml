@@ -163,12 +163,14 @@
         <item>aes-256-gcm</item>
     </string-array>
     <string-array name="easyss_proxyrule_list" >
+        <item>AUTO BLOCK (SKIP LAN and CN, BLOCK AD)</item>
         <item>AUTO (SKIP LAN and CN)</item>
         <item>Reverse Auto</item>
         <item>Proxy All</item>
         <item>Direct</item>
     </string-array>
     <string-array name="easyss_proxyrule_list_value" >
+        <item>auto_block</item>
         <item>auto</item>
         <item>reverse_auto</item>
         <item>proxy</item>
