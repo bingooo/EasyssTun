@@ -148,11 +148,11 @@
                 <TextView
                     android:id="@+id/speed_result"
                     style="@style/CardTitle"
-                    android:text="@string/speedtest_placeholder" />
+                    android:text="@string/speedtest_summary" />
 
                 <TextView
-                    style="@style/CardSummary"
-                    android:text="@string/speedtest_summary" />
+                    android:id="@+id/version_placeholder"
+                    style="@style/CardSummary"/>
             </LinearLayout>
         </LinearLayout>
 

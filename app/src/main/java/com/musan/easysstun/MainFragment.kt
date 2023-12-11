@@ -116,7 +116,6 @@ class MainFragment : Fragment() {
             pref.isServiceEnabled = false
         }
 
-
         view.findViewById<MaterialButton>(R.id.service_setting)
             .let {
                 it.setOnClickListener {
@@ -132,6 +131,9 @@ class MainFragment : Fragment() {
             }
         }
 
+        view.findViewById<TextView>(R.id.version_placeholder).let {
+            it.text = BuildConfig.version
+        }
 
         speed_test_icon = view.findViewById<ImageView>(R.id.speed_test_icon)
         initRotateAnimation()
