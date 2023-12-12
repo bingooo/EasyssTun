@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import android.os.AsyncTask
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -27,6 +28,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -52,6 +55,8 @@ class MainFragment : Fragment() {
         easyssInfo = pref.getEasyssInfo()
         setup(view)
         updateServiceStatu(view)
+
+        GitTagTask(view, requireContext()).execute()
 
         return view
     }
@@ -131,10 +136,6 @@ class MainFragment : Fragment() {
             }
         }
 
-        view.findViewById<TextView>(R.id.version_placeholder).let {
-            it.text = BuildConfig.version
-        }
-
         speed_test_icon = view.findViewById<ImageView>(R.id.speed_test_icon)
         initRotateAnimation()
 
@@ -148,6 +149,39 @@ class MainFragment : Fragment() {
             }
         }
     }
+
+    private inner class GitTagTask(private val rootView: View, private val context: Context) : AsyncTask<Void, Void, String>() {
+
+        override fun doInBackground(vararg params: Void): String {
+            val libraryPath = context.applicationInfo.nativeLibraryDir.toString() + "/libeasyss.so"
+            val command = listOf(libraryPath, "--version")
+            val processBuilder = ProcessBuilder(command)
+            processBuilder.redirectErrorStream(true)
+
+            val process = processBuilder.start()
+
+            val reader = BufferedReader(InputStreamReader(process.inputStream))
+            var line: String?
+            var gitTag = "Easyss"
+            while (reader.readLine().also { line = it } != null) {
+                // 在输出中查找包含 "Git tag:" 的行
+                if (line!!.startsWith("Git tag:")) {
+                    gitTag += ": " + line!!.substringAfter(":").trim()
+                    break
+                }
+            }
+
+            process.waitFor()
+            return gitTag
+        }
+
+        override fun onPostExecute(gitTag: String) {
+            // 将 Git tag 设置到 TextView 上
+            val versionPlaceholder = rootView.findViewById<TextView>(R.id.version_placeholder)
+            versionPlaceholder.text = gitTag
+        }
+    }
+
 
     override fun onActivityResult(request: Int, result: Int, data: Intent?) {
         if (pref.isServiceEnabled) {

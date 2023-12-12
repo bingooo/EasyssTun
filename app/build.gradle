@@ -11,7 +11,7 @@ android {
         applicationId "com.musan.easysstun"
         minSdk 26
         targetSdk 33
-        versionCode 10
+        versionCode 11
         versionName "1.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -36,12 +36,10 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField "String", "version", "\"Easyss: v2.4.0\""
             resValue "string", "app_name", "EasyssTun (Debug)"
             applicationIdSuffix ".debug"
         }
         release {
-            buildConfigField "String", "version", "\"Easyss: v2.4.0\""
             resValue "string", "app_name", "EasyssTun"
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
