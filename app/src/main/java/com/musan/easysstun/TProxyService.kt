@@ -276,6 +276,8 @@ tunnel:
         private external fun TProxyStartService(config_path: String, fd: Int)
         @JvmStatic
         private external fun TProxyStopService()
+        @JvmStatic
+        private external fun TProxyGetStats(): LongArray
 
         const val ACTION_CONNECT = "CONNECT"
         const val ACTION_DISCONNECT = "DISCONNECT"
