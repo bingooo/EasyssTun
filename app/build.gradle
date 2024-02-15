@@ -11,7 +11,7 @@ android {
         applicationId "com.musan.easysstun"
         minSdk 26
         targetSdk 33
-        versionCode 13
+        versionCode 14
         versionName "1.4"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -41,21 +41,33 @@ android {
         }
         release {
             resValue "string", "app_name", "EasyssTun"
-            minifyEnabled true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            ndk {
-                abiFilters 'arm64-v8a'
-            }
+//            minifyEnabled true
+//            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+//            ndk {
+//                abiFilters 'arm64-v8a', 'x86_64'
+//            }
         }
     }
+
+    splits {
+        abi {
+            enable true
+            reset()
+            include "arm64-v8a", "x86_64"
+            universalApk false
+        }
+    }
+
 
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
             def versionCode = variant.versionCode
             def versionName = variant.versionName
             def formattedDate = new Date().format('yyyyMMdd')
+            def abi = output.getFilter(com.android.build.OutputFile.ABI)
+            if (abi == null) abi = "all"
 
-            output.outputFileName = "EasyssTun_v${versionName}_${versionCode}_${variant.name}_${formattedDate}.apk"
+            output.outputFileName = "EasyssTun_v${versionName}_${versionCode}_${abi}_${variant.name}_${formattedDate}.apk"
         }
     }
 
