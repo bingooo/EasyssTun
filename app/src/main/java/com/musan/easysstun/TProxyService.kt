@@ -113,6 +113,9 @@ class TProxyService : VpnService() {
 //            if (!session.isEmpty()) session += " + "
 //            session += "IPv6"
 //        }
+        builder.addAddress("2001:0db8:0:f101::1", 64)
+        session += "IPv6"
+
         for (appName in pref.getApps()!!) {
             try {
                 builder.addDisallowedApplication(appName)
