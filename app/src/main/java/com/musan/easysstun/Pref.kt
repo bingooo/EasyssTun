@@ -54,6 +54,7 @@ class Pref(private val ctx: Context) {
         var easyss_outbound = prefs.getString("easyss_outbound", "native")
         var easyss_loglevel = prefs.getString("easyss_loglevel", "info")
         var easyss_disable_quic = prefs.getString("easyss_disable_quic", "false")
+        var easyss_ipv6_rule = prefs.getString("easyss_ipv6_rule", "auto")
 
 
 //        val cmdList = mutableListOf<String>()
@@ -67,6 +68,7 @@ class Pref(private val ctx: Context) {
             "-m", "chacha20-poly1305",
             "-log-level", easyss_loglevel,
             String.format("-disable-quic=%s", easyss_disable_quic),
+            "-ipv6-rule", easyss_ipv6_rule,
             "-enable-tun2socks=false",
             "-daemon=false")
 

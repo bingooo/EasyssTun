@@ -74,4 +74,13 @@
             android:defaultValue="false"
             app:useSimpleSummaryProvider="true"/>
 
+        <DropDownPreference
+            app:icon="@drawable/ic_settings_outline_24dp"
+            android:key="@string/easyss_ipv6_rule"
+            android:title="@string/easyss_ipv6_rule"
+            android:entries="@array/easyss_ipv6_rule_list"
+            android:entryValues="@array/easyss_ipv6_rule_value"
+            android:defaultValue="auto"
+            app:useSimpleSummaryProvider="true"/>
+
 </PreferenceScreen>
