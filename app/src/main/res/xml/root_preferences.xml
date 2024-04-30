@@ -83,4 +83,11 @@
             android:defaultValue="auto"
             app:useSimpleSummaryProvider="true"/>
 
+        <EditTextPreference
+            app:icon="@drawable/public_24px"
+            android:maxLines="1"
+            app:key="@string/easyss_sn"
+            app:title="@string/easyss_sn"
+            app:useSimpleSummaryProvider="true" />
+
 </PreferenceScreen>

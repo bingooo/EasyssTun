@@ -27,6 +27,7 @@
     <string name="easyss_loglevel">Easyss 日志级别</string>
     <string name="easyss_disable_quic">Easyss 禁用QUIC</string>
     <string name="easyss_ipv6_rule">Easyss IPv6规则</string>
+    <string name="easyss_sn">Easyss Server Name</string>
     <string name="easyss_custom_ca">Easyss 自定义证书</string>
     <string name="not_set">未配置</string>
 </resources>
