@@ -57,6 +57,9 @@ class Pref(private val ctx: Context) {
         var easyss_ipv6_rule = prefs.getString("easyss_ipv6_rule", "auto")
         var easyss_sn = prefs.getString("easyss_sn", "")
 
+        if (easyss_sn.isNullOrBlank()) {
+            easyss_sn = easyss_server
+        }
 
 //        val cmdList = mutableListOf<String>()
         var cmdList = listOf("-s", easyss_server,
