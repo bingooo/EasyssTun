@@ -99,22 +99,10 @@ class TProxyService : VpnService() {
             val parts = it.split('/', limit = 2)
             builder.addRoute(parts[0], parts[1].toInt())
         }
-//        builder.addRoute("0.0.0.0", 0)
-//        builder.addRoute("198.18.0.2", 32)
-        session += "IPv4"
 
-//        if (prefs.getIpv6()) {
-//            val addr: String = prefs.getTunnelIpv6Address()
-//            val prefix: Int = prefs.getTunnelIpv6Prefix()
-//            val dns: String = prefs.getDnsIpv6()
-//            builder.addAddress(addr, prefix)
-//            builder.addRoute("::", 0)
-//            if (!dns.isEmpty()) builder.addDnsServer(dns)
-//            if (!session.isEmpty()) session += " + "
-//            session += "IPv6"
-//        }
+        session += "IPv4/v6"
+
         builder.addAddress("2001:0db8:0:f101::1", 64)
-        session += "IPv6"
 
         for (appName in pref.getApps()!!) {
             try {
