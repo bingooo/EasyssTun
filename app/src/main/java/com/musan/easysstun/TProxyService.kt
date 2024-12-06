@@ -95,7 +95,7 @@ class TProxyService : VpnService() {
         builder.addAddress("198.18.0.1", 32)
 
 //        builder.addDnsServer("223.6.6.6")
-        builder.addDnsServer("1.1.1.1")
+        builder.addDnsServer("1.0.0.1")
 
         resources.getStringArray(R.array.bypass_private_route).forEach {
             val parts = it.split('/', limit = 2)

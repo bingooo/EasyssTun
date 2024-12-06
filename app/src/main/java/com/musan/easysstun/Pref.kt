@@ -68,6 +68,8 @@ class Pref(private val ctx: Context) {
             "-t", "60",
             "-log-level", easyss_loglevel,
             String.format("-disable-quic=%s", easyss_disable_quic),
+            "-bind-all=false",
+            "-enable-forward-dns=false",
             "-enable-tun2socks=false",
             "-daemon=false")
 
