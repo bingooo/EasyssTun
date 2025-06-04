@@ -10,9 +10,9 @@ android {
     defaultConfig {
         applicationId "com.musan.easysstun"
         minSdk 26
-        targetSdk 33
-        versionCode 29
-        versionName "2.0"
+        targetSdk 34
+        versionCode 32
+        versionName "2.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

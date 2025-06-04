@@ -12,6 +12,8 @@
     <uses-permission
         android:name="android.permission.READ_LOGS"
         tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"
+        android:minSdkVersion="34" />
 
     <application
         android:allowBackup="true"
@@ -23,7 +25,7 @@
         android:enableOnBackInvokedCallback="true"
         android:supportsRtl="true"
         android:theme="@style/Theme"
-        tools:targetApi="31">
+        tools:targetApi="tiramisu">
 
         <receiver
             android:name=".ServiceReceiver"
@@ -38,10 +40,13 @@
             android:name=".TProxyService"
             android:exported="true"
             android:permission="android.permission.BIND_VPN_SERVICE"
+            android:foregroundServiceType="specialUse"
             android:process=":native">
             <intent-filter>
                 <action android:name="android.net.VpnService" />
             </intent-filter>
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="VPN service"/>
         </service>
 
         <activity
