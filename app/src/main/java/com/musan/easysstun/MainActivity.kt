@@ -31,7 +31,6 @@ class MainActivity : AppCompatActivity() {
         appBarConfiguration = AppBarConfiguration(navController.graph)
         setupActionBarWithNavController(navController, appBarConfiguration)
 
-
         requestPermissionLauncher = registerForActivityResult(RequestPermission()) {
         }
         requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
