@@ -98,16 +98,15 @@ class TProxyService : VpnService() {
         builder.setMtu(8500)
 
         builder.addAddress("198.18.0.1", 32)
-
-//        builder.addDnsServer("223.6.6.6")
         builder.addDnsServer("1.0.0.1")
+//        builder.addRoute("192.168.17.1", 32)
 
         resources.getStringArray(R.array.bypass_private_route).forEach {
             val parts = it.split('/', limit = 2)
             builder.addRoute(parts[0], parts[1].toInt())
         }
 //        builder.addRoute("0.0.0.0", 0)
-//        builder.addRoute("198.18.0.2", 32)
+
         session += "IPv4"
 
 //        if (prefs.getIpv6()) {
@@ -202,7 +201,8 @@ class TProxyService : VpnService() {
   task-stack-size: 86016
   tcp-buffer-size: 65536
   connect-timeout: 5000
-  read-write-timeout: 600000
+  tcp-read-write-timeout: 600000
+  udp-read-write-timeout: 60000
   log-file: stdout
   log-level: info
 tunnel:
