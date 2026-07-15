@@ -34,6 +34,23 @@ android {
         }
     }
 
+    signingConfigs {
+        release {
+            Properties properties = new Properties()
+            def localPropertiesFile = project.rootProject.file('local.properties')
+            if (localPropertiesFile.exists()) {
+                properties.load(localPropertiesFile.newDataInputStream())
+            }
+            def storePath = properties.getProperty('signing.storeFile', '')
+            if (storePath != '') {
+                storeFile file(storePath)
+                storePassword properties.getProperty('signing.storePassword', '')
+                keyAlias properties.getProperty('signing.keyAlias', '')
+                keyPassword properties.getProperty('signing.keyPassword', properties.getProperty('signing.storePassword', ''))
+            }
+        }
+    }
+
     buildTypes {
         debug {
             resValue "string", "app_name", "EasyssTun (Debug)"
@@ -41,6 +58,7 @@ android {
         }
         release {
             resValue "string", "app_name", "EasyssTun"
+            signingConfig signingConfigs.release
 //            minifyEnabled true
 //            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
 //            ndk {
