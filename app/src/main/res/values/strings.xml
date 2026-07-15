@@ -30,4 +30,16 @@
     <string name="easyss_disable_quic">Easyss Disable QUIC</string>
     <string name="easyss_custom_ca">Easyss Custom CA</string>
     <string name="not_set">Not Set</string>
+    <string name="easyss_name">Server Name (Optional)</string>
+    <string name="servers_title">Servers</string>
+    <string name="add_server">Add Server</string>
+    <string name="edit_server">Edit Server</string>
+    <string name="delete_server">Delete Server</string>
+    <string name="server_name">Server Name</string>
+    <string name="dialog_delete_title">Delete Server</string>
+    <string name="dialog_delete_message">Are you sure you want to delete this server?</string>
+    <string name="dialog_add_title">Add Server</string>
+    <string name="dialog_edit_title">Edit Server Name</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Confirm</string>
 </resources>

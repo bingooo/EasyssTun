@@ -2,10 +2,11 @@ package com.musan.easysstun
 import android.content.Context
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
-
 
 class Pref(private val ctx: Context) {
     companion object {
@@ -36,27 +37,95 @@ class Pref(private val ctx: Context) {
         return prefs.all
     }
 
-    fun getEasyssInfo(): easyssInfo {
-        val myMap = mutableMapOf<String, Any?>()
-        var easyssInfo = easyssInfo()
-        var easyss_server = prefs.getString("easyss_server", "")
-        var easyss_serverport = prefs.getString("easyss_serverport", "")
-        var easyss_password = prefs.getString("easyss_password", "")
+    fun saveServerList(servers: List<ServerConfig>) {
+        val array = JSONArray()
+        for (server in servers) {
+            val obj = JSONObject()
+            obj.put("id", server.id)
+            obj.put("name", server.name)
+            array.put(obj)
+        }
+        prefs.edit().putString("server_list", array.toString()).apply()
+    }
 
-        myMap["valid"] = false
-        if (!easyss_server.isNullOrBlank() and !easyss_serverport.isNullOrBlank() and !easyss_password.isNullOrBlank()){
-            easyssInfo.valid = true
-            easyssInfo.info = easyss_server.toString() + ":" + easyss_serverport.toString()
+    fun getServerList(): List<ServerConfig> {
+        val json = prefs.getString("server_list", null) ?: return emptyList()
+        val list = mutableListOf<ServerConfig>()
+        try {
+            val array = JSONArray(json)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(ServerConfig(obj.getString("id"), obj.getString("name")))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return list
+    }
+
+    fun migrateIfNeeded() {
+        val serverListJson = prefs.getString("server_list", null)
+        if (serverListJson == null) {
+            val oldServer = prefs.getString("easyss_server", "")
+            if (!oldServer.isNullOrBlank()) {
+                val newId = java.util.UUID.randomUUID().toString()
+                val serverName = "Default"
+
+                val serverPrefs = ctx.getSharedPreferences("server_$newId", Context.MODE_PRIVATE)
+                val edit = serverPrefs.edit()
+
+                val keysToMigrate = listOf(
+                    "easyss_server", "easyss_serverport", "easyss_password",
+                    "easyss_encryption", "easyss_proxyrule", "easyss_outbound",
+                    "easyss_custom_ca", "easyss_loglevel", "easyss_disable_quic"
+                )
+                for (key in keysToMigrate) {
+                    if (prefs.contains(key)) {
+                        val value = prefs.all[key]
+                        if (value is String) {
+                            edit.putString(key, value)
+                        } else if (value is Boolean) {
+                            edit.putBoolean(key, value)
+                        }
+                    }
+                }
+                edit.apply()
+
+                val servers = listOf(ServerConfig(newId, serverName))
+                saveServerList(servers)
+                prefs.edit().putString("active_server_id", newId).apply()
+            }
+        }
+    }
+
+    fun getEasyssInfo(): easyssInfo {
+        migrateIfNeeded()
+
+        val activeId = prefs.getString("active_server_id", "")
+        if (activeId.isNullOrBlank()) {
+            return easyssInfo(valid = false)
         }
 
-        var easyss_encryption = prefs.getString("easyss_encryption", "chacha20-poly1305")?:"aes-256-gcm"
-        var easyss_proxyrule = prefs.getString("easyss_proxyrule", "auto")
-        var easyss_outbound = prefs.getString("easyss_outbound", "native")
-        var easyss_loglevel = prefs.getString("easyss_loglevel", "info")
-        var easyss_disable_quic = prefs.getString("easyss_disable_quic", "false")
+        val serverPrefs = ctx.getSharedPreferences("server_$activeId", Context.MODE_PRIVATE)
 
+        var easyssInfo = easyssInfo()
+        var easyss_server = serverPrefs.getString("easyss_server", "") ?: ""
+        var easyss_serverport = serverPrefs.getString("easyss_serverport", "") ?: ""
+        var easyss_password = serverPrefs.getString("easyss_password", "") ?: ""
 
-//        val cmdList = mutableListOf<String>()
+        if (!easyss_server.isNullOrBlank() && !easyss_serverport.isNullOrBlank() && !easyss_password.isNullOrBlank()){
+            easyssInfo.valid = true
+            val serverList = getServerList()
+            val serverName = serverList.find { it.id == activeId }?.name ?: "Server"
+            easyssInfo.info = "$serverName ($easyss_server:$easyss_serverport)"
+        }
+
+        var easyss_encryption = serverPrefs.getString("easyss_encryption", "chacha20-poly1305") ?: "chacha20-poly1305"
+        var easyss_proxyrule = serverPrefs.getString("easyss_proxyrule", "auto") ?: "auto"
+        var easyss_outbound = serverPrefs.getString("easyss_outbound", "native") ?: "native"
+        var easyss_loglevel = serverPrefs.getString("easyss_loglevel", "info") ?: "info"
+        var easyss_disable_quic = serverPrefs.getString("easyss_disable_quic", "false") ?: "false"
+
         var cmdList = listOf("-s", easyss_server,
             "-p", easyss_serverport,
             "-k", easyss_password,
@@ -73,7 +142,7 @@ class Pref(private val ctx: Context) {
             "-enable-tun2socks=false",
             "-daemon=false")
 
-        var easyss_custom_ca = prefs.getString("easyss_custom_ca", "")
+        var easyss_custom_ca = serverPrefs.getString("easyss_custom_ca", "")
         if (!easyss_custom_ca.isNullOrBlank()){
             val easyss_custom_ca_file = File(ctx.cacheDir, "easyss_custom_ca.conf")
             try {
@@ -88,7 +157,7 @@ class Pref(private val ctx: Context) {
             cmdList = cmdList + listOf("-ca-path", easyss_custom_ca_file.absolutePath)
         }
 
-        easyssInfo.cmdList = cmdList as List<String>
+        easyssInfo.cmdList = cmdList
 
         return easyssInfo
     }

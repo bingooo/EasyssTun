@@ -28,4 +28,16 @@
     <string name="easyss_disable_quic">Easyss 禁用QUIC</string>
     <string name="easyss_custom_ca">Easyss 自定义证书</string>
     <string name="not_set">未配置</string>
+    <string name="easyss_name">服务器名称 (可选)</string>
+    <string name="servers_title">服务器列表</string>
+    <string name="add_server">添加服务器</string>
+    <string name="edit_server">编辑服务器</string>
+    <string name="delete_server">删除服务器</string>
+    <string name="server_name">服务器名称</string>
+    <string name="dialog_delete_title">删除服务器</string>
+    <string name="dialog_delete_message">确定要删除此服务器吗？</string>
+    <string name="dialog_add_title">添加服务器</string>
+    <string name="dialog_edit_title">编辑服务器名称</string>
+    <string name="cancel">取消</string>
+    <string name="confirm">确定</string>
 </resources>

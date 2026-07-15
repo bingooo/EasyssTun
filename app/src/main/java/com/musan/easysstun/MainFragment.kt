@@ -124,7 +124,7 @@ class MainFragment : Fragment() {
         view.findViewById<MaterialButton>(R.id.service_setting)
             .let {
                 it.setOnClickListener {
-                    findNavController().navigate(R.id.action_main_to_setting)
+                    findNavController().navigate(R.id.action_main_to_servers)
                     true
                 }
             }

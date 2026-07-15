@@ -1,18 +1,20 @@
 package com.musan.easysstun
 
-
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
-import java.io.File
-
+import androidx.preference.PreferenceManager
 
 class SettingsFragment : PreferenceFragmentCompat() {
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
+        val serverId = arguments?.getString("server_id") ?: "default"
+        preferenceManager.sharedPreferencesName = "server_$serverId"
+
         setPreferencesFromResource(R.xml.root_preferences, rootKey)
 
         val passwordPreference = findPreference<EditTextPreference>("easyss_password")
@@ -34,15 +36,29 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
         }
 
+        val defaultPrefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
+        val activeServerId = defaultPrefs.getString("active_server_id", "") ?: ""
+        val isEditingActive = (serverId == activeServerId)
+
         // 获取所有设置项，并为每个设置项添加监听器
         for (i in 0 until preferenceScreen.preferenceCount) {
             val preference = preferenceScreen.getPreference(i)
             preference.setOnPreferenceChangeListener { _, newValue ->
-                // 发送广播通知Service
-                val intent = Intent("prefs_updated")
-                intent.putExtra("preference_key", preference.key)
-                intent.putExtra("new_value", newValue.toString())
-                context?.sendBroadcast(intent)
+                if (preference.key == "easyss_name") {
+                    val prefHelper = Pref(requireContext())
+                    val servers = prefHelper.getServerList().map {
+                        if (it.id == serverId) ServerConfig(it.id, newValue.toString().trim()) else it
+                    }
+                    prefHelper.saveServerList(servers)
+                }
+
+                if (isEditingActive) {
+                    // 发送广播通知Service
+                    val intent = Intent("prefs_updated")
+                    intent.putExtra("preference_key", preference.key)
+                    intent.putExtra("new_value", newValue.toString())
+                    context?.sendBroadcast(intent)
+                }
                 true
             }
         }

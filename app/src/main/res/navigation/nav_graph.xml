@@ -7,6 +7,10 @@
         android:id="@+id/SettingsFragment"
         android:name="com.musan.easysstun.SettingsFragment"
         android:label="@string/easyss_configure_title">
+        <argument
+            android:name="server_id"
+            app:argType="string"
+            android:defaultValue="default" />
         <action
             android:id="@+id/action_nav_setting_to_applist"
             app:destination="@+id/AppListFragment" />
@@ -25,12 +29,21 @@
     </fragment>
 
     <fragment
+        android:id="@+id/ServersFragment"
+        android:name="com.musan.easysstun.ServersFragment"
+        android:label="@string/servers_title">
+        <action
+            android:id="@+id/action_servers_to_setting"
+            app:destination="@+id/SettingsFragment" />
+    </fragment>
+
+    <fragment
         android:id="@+id/MainFragment"
         android:name="com.musan.easysstun.MainFragment"
         android:label="@string/app_name">
         <action
-            android:id="@+id/action_main_to_setting"
-            app:destination="@+id/SettingsFragment" />
+            android:id="@+id/action_main_to_servers"
+            app:destination="@+id/ServersFragment" />
 
         <action
             android:id="@+id/action_main_to_applist"
