@@ -207,4 +207,13 @@
         <item>error</item>
     </string-array>
 
+    <string-array name="easyss_version_list">
+        <item>2.x</item>
+        <item>3.x</item>
+    </string-array>
+    <string-array name="easyss_version_list_value">
+        <item>2</item>
+        <item>3</item>
+    </string-array>
+
 </resources>

@@ -8,6 +8,15 @@
             app:title="@string/easyss_name"
             app:useSimpleSummaryProvider="true" />
 
+        <ListPreference
+            app:icon="@drawable/ic_outline_info_24"
+            android:key="easyss_version"
+            android:title="@string/easyss_version"
+            android:entries="@array/easyss_version_list"
+            android:entryValues="@array/easyss_version_list_value"
+            android:defaultValue="2"
+            app:useSimpleSummaryProvider="true" />
+
         <EditTextPreference
             app:icon="@drawable/public_24px"
             android:maxLines="1"

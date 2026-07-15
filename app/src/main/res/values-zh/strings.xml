@@ -40,4 +40,5 @@
     <string name="dialog_edit_title">编辑服务器名称</string>
     <string name="cancel">取消</string>
     <string name="confirm">确定</string>
+    <string name="easyss_version">Easyss 内核版本</string>
 </resources>

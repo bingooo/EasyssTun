@@ -148,7 +148,8 @@ class TProxyService : VpnService() {
             while (true) {
 
                 try {
-                    val libraryPath = applicationInfo.nativeLibraryDir.toString() + "/libeasyss.so"
+                    val libName = if (easyssInfo.coreVersion == "3") "/libeasyss3.so" else "/libeasyss.so"
+                    val libraryPath = applicationInfo.nativeLibraryDir.toString() + libName
                     var cmdList = listOf(libraryPath) + easyssInfo.cmdList
                     Log.i("easyss", cmdList.toString())
                     process = ProcessBuilder(cmdList).start()

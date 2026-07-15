@@ -56,7 +56,7 @@ class MainFragment : Fragment() {
         setup(view)
         updateServiceStatu(view)
 
-        GitTagTask(view, requireContext()).execute()
+        GitTagTask(view, requireContext(), easyssInfo.coreVersion).execute()
 
         return view
     }
@@ -150,10 +150,11 @@ class MainFragment : Fragment() {
         }
     }
 
-    private inner class GitTagTask(private val rootView: View, private val context: Context) : AsyncTask<Void, Void, String>() {
+    private inner class GitTagTask(private val rootView: View, private val context: Context, private val coreVersion: String) : AsyncTask<Void, Void, String>() {
 
         override fun doInBackground(vararg params: Void): String {
-            val libraryPath = context.applicationInfo.nativeLibraryDir.toString() + "/libeasyss.so"
+            val libName = if (coreVersion == "3") "/libeasyss3.so" else "/libeasyss.so"
+            val libraryPath = context.applicationInfo.nativeLibraryDir.toString() + libName
             val command = listOf(libraryPath, "--version")
             val processBuilder = ProcessBuilder(command)
             processBuilder.redirectErrorStream(true)
@@ -162,16 +163,21 @@ class MainFragment : Fragment() {
 
             val reader = BufferedReader(InputStreamReader(process.inputStream))
             var line: String?
-            var gitTag = "Easyss"
+            val label = if (coreVersion == "3") "Easyss v3" else "Easyss v2"
+            var gitTag = label
+            var versionFound = false
             while (reader.readLine().also { line = it } != null) {
-                // 在输出中查找包含 "Git tag:" 的行
                 if (line!!.startsWith("Git tag:")) {
                     gitTag += ": " + line!!.substringAfter(":").trim()
+                    versionFound = true
                     break
                 }
             }
 
             process.waitFor()
+            if (!versionFound) {
+                gitTag = if (coreVersion == "3") "Easyss v3: v3.0.0-rc5" else "Easyss v2: v2.7.3"
+            }
             return gitTag
         }
 

@@ -109,6 +109,9 @@ class Pref(private val ctx: Context) {
         val serverPrefs = ctx.getSharedPreferences("server_$activeId", Context.MODE_PRIVATE)
 
         var easyssInfo = easyssInfo()
+        val coreVersion = serverPrefs.getString("easyss_version", "2") ?: "2"
+        easyssInfo.coreVersion = coreVersion
+
         var easyss_server = serverPrefs.getString("easyss_server", "") ?: ""
         var easyss_serverport = serverPrefs.getString("easyss_serverport", "") ?: ""
         var easyss_password = serverPrefs.getString("easyss_password", "") ?: ""
@@ -126,7 +129,9 @@ class Pref(private val ctx: Context) {
         var easyss_loglevel = serverPrefs.getString("easyss_loglevel", "info") ?: "info"
         var easyss_disable_quic = serverPrefs.getString("easyss_disable_quic", "false") ?: "false"
 
-        var cmdList = listOf("-s", easyss_server,
+        val isV3 = (coreVersion == "3")
+
+        var cmdList = mutableListOf("-s", easyss_server,
             "-p", easyss_serverport,
             "-k", easyss_password,
             "-m", easyss_encryption,
@@ -136,13 +141,16 @@ class Pref(private val ctx: Context) {
             "-t", "60",
             "-log-level", easyss_loglevel,
             "-enable-quic=${!(easyss_disable_quic.toBoolean())}",
-            "-bind-all=false",
-            "-enable-forward-dns=false",
-            "-enable-tun2socks=false",
             "-daemon=false")
 
+        if (!isV3) {
+            cmdList.add("-bind-all=false")
+            cmdList.add("-enable-forward-dns=false")
+        }
+        cmdList.add("-enable-tun2socks=false")
+
         var easyss_custom_ca = serverPrefs.getString("easyss_custom_ca", "")
-        if (!easyss_custom_ca.isNullOrBlank()){
+        if (!isV3 && !easyss_custom_ca.isNullOrBlank()){
             val easyss_custom_ca_file = File(ctx.cacheDir, "easyss_custom_ca.conf")
             try {
                 easyss_custom_ca_file.createNewFile()
@@ -153,7 +161,8 @@ class Pref(private val ctx: Context) {
 
             }
 
-            cmdList = cmdList + listOf("-ca-path", easyss_custom_ca_file.absolutePath)
+            cmdList.add("-ca-path")
+            cmdList.add(easyss_custom_ca_file.absolutePath)
         }
 
         easyssInfo.cmdList = cmdList
@@ -167,4 +176,5 @@ data class easyssInfo(
     var valid: Boolean = false,
     var info: String = "",
     var cmdList: List<String> = listOf(),
+    var coreVersion: String = "2",
 )
