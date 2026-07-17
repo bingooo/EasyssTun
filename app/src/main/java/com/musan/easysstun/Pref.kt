@@ -165,6 +165,68 @@ class Pref(private val ctx: Context) {
             cmdList.add(easyss_custom_ca_file.absolutePath)
         }
 
+        val easyss_direct_domains = serverPrefs.getString("easyss_direct_domains", "") ?: ""
+        val easyss_proxy_domains = serverPrefs.getString("easyss_proxy_domains", "") ?: ""
+
+        if (isV3) {
+            if (easyss_direct_domains.isNotBlank()) {
+                val directFile = File(ctx.cacheDir, "direct_$activeId.txt")
+                try {
+                    directFile.writeText(easyss_direct_domains)
+                    cmdList.add("-direct-file")
+                    cmdList.add(directFile.absolutePath)
+                } catch (e: IOException) {
+                }
+            } else {
+                val directFile = File(ctx.cacheDir, "direct_$activeId.txt")
+                if (directFile.exists()) directFile.delete()
+            }
+
+            if (easyss_proxy_domains.isNotBlank()) {
+                val proxyFile = File(ctx.cacheDir, "proxy_$activeId.txt")
+                try {
+                    proxyFile.writeText(easyss_proxy_domains)
+                    cmdList.add("-proxy-file")
+                    cmdList.add(proxyFile.absolutePath)
+                } catch (e: IOException) {
+                }
+            } else {
+                val proxyFile = File(ctx.cacheDir, "proxy_$activeId.txt")
+                if (proxyFile.exists()) proxyFile.delete()
+            }
+        } else {
+            val domainsBuilder = StringBuilder()
+            val ipsBuilder = StringBuilder()
+            easyss_direct_domains.lineSequence().forEach { line ->
+                val trimmed = line.trim()
+                if (trimmed.isNotEmpty()) {
+                    if (trimmed.matches(Regex("^[0-9./:]+$"))) {
+                        ipsBuilder.append(trimmed).append("\n")
+                    } else {
+                        domainsBuilder.append(trimmed).append("\n")
+                    }
+                }
+            }
+
+            val v2DomainsFile = File(ctx.cacheDir, "direct_domains.txt")
+            if (domainsBuilder.length > 0) {
+                try {
+                    v2DomainsFile.writeText(domainsBuilder.toString())
+                } catch (e: IOException) {}
+            } else {
+                if (v2DomainsFile.exists()) v2DomainsFile.delete()
+            }
+
+            val v2IpsFile = File(ctx.cacheDir, "direct_ips.txt")
+            if (ipsBuilder.length > 0) {
+                try {
+                    v2IpsFile.writeText(ipsBuilder.toString())
+                } catch (e: IOException) {}
+            } else {
+                if (v2IpsFile.exists()) v2IpsFile.delete()
+            }
+        }
+
         easyssInfo.cmdList = cmdList
 
         return easyssInfo

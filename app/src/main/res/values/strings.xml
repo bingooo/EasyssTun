@@ -43,4 +43,6 @@
     <string name="cancel">Cancel</string>
     <string name="confirm">Confirm</string>
     <string name="easyss_version">Easyss Core Version</string>
+    <string name="easyss_direct_domains">Direct Domains &amp; IPs (one per line)</string>
+    <string name="easyss_proxy_domains">Proxy Domains &amp; IPs (one per line)</string>
 </resources>

@@ -36,6 +36,19 @@ class SettingsFragment : PreferenceFragmentCompat() {
             }
         }
 
+        val directPreference = findPreference<EditTextPreference>("easyss_direct_domains")
+        directPreference?.setOnBindEditTextListener { editText ->
+            editText.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            editText.isSingleLine = false
+            editText.setLines(5)
+        }
+        val proxyPreference = findPreference<EditTextPreference>("easyss_proxy_domains")
+        proxyPreference?.setOnBindEditTextListener { editText ->
+            editText.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            editText.isSingleLine = false
+            editText.setLines(5)
+        }
+
         val defaultPrefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
         val activeServerId = defaultPrefs.getString("active_server_id", "") ?: ""
         val isEditingActive = (serverId == activeServerId)

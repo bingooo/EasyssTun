@@ -72,6 +72,18 @@
             app:title="@string/easyss_custom_ca"
             app:useSimpleSummaryProvider="true" />
 
+        <EditTextPreference
+            app:icon="@drawable/alt_route_24px"
+            app:key="easyss_direct_domains"
+            app:title="@string/easyss_direct_domains"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:icon="@drawable/alt_route_24px"
+            app:key="easyss_proxy_domains"
+            app:title="@string/easyss_proxy_domains"
+            app:useSimpleSummaryProvider="true" />
+
         <DropDownPreference
             app:icon="@drawable/ic_terminal_24"
             android:key="easyss_loglevel"

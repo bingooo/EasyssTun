@@ -152,7 +152,7 @@ class TProxyService : VpnService() {
                     val libraryPath = applicationInfo.nativeLibraryDir.toString() + libName
                     var cmdList = listOf(libraryPath) + easyssInfo.cmdList
                     Log.i("easyss", cmdList.toString())
-                    process = ProcessBuilder(cmdList).start()
+                    process = ProcessBuilder(cmdList).directory(cacheDir).start()
 
                     Log.d("easyss", "msg=[EasyssTun] Connected to the service successfully.")
                     val bufferedReader =

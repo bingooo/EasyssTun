@@ -41,4 +41,6 @@
     <string name="cancel">取消</string>
     <string name="confirm">确定</string>
     <string name="easyss_version">Easyss 内核版本</string>
+    <string name="easyss_direct_domains">直连域名与IP (每行一个)</string>
+    <string name="easyss_proxy_domains">代理域名与IP (每行一个)</string>
 </resources>
