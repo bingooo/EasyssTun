@@ -43,4 +43,14 @@
     <string name="easyss_version">Easyss 内核版本</string>
     <string name="easyss_direct_domains">直连域名与IP (每行一个)</string>
     <string name="easyss_proxy_domains">代理域名与IP (每行一个)</string>
+    <string name="app_routing_mode">应用代理模式</string>
+    <string name="show_system_apps">显示系统应用</string>
+    <string name="routing_mode_bypass">绕过选择的应用</string>
+    <string name="routing_mode_proxy">仅代理选择的应用</string>
+    <string name="proxied_app_list">已配置代理 %s 个应用</string>
+    <string name="choose_app_to_proxy">点按配置代理的应用</string>
+    <string name="applist_title_proxy">选择代理的应用</string>
+    <string name="route_desc_proxy">默认情况下，EasysTun 将会跳过局域网地址以及本应用的流量。 同时，只有以上选中的应用才会走 VPN 代理。\n\n未选中应用的网络流量将直接连接。</string>
+    <string name="app_routing_mode_bypass_desc">已勾选的应用将绕过 VPN 直接连接，其余流量走代理</string>
+    <string name="app_routing_mode_proxy_desc">仅已勾选的应用走 VPN 代理，其余流量将直接连接</string>
 </resources>

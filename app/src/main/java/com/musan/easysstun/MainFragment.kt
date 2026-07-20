@@ -109,9 +109,20 @@ class MainFragment : Fragment() {
         }
 
         var selected_apps = pref.getApps()!!
+        val appProxyMode = pref.prefs.getString("app_proxy_mode", "bypass") ?: "bypass"
+        val isProxyMode = (appProxyMode == "proxy")
+
         view.findViewById<TextView>(R.id.text1).let {
-            it.text = getString(R.string.skipped_app_list, selected_apps.size.toString())
+            val stringRes = if (isProxyMode) R.string.proxied_app_list else R.string.skipped_app_list
+            it.text = getString(stringRes, selected_apps.size.toString())
         }
+
+        view.findViewById<TextView>(android.R.id.text2).let {
+            val stringRes = if (isProxyMode) R.string.choose_app_to_proxy else R.string.choose_app_to_bypass
+            it.text = getString(stringRes)
+        }
+
+
 
         if (easyssInfo.valid){
             view.findViewById<TextView>(R.id.service_summary).let {
@@ -142,7 +153,7 @@ class MainFragment : Fragment() {
         view.findViewById<LinearLayout>(R.id.speed_test).let {
             it.setOnClickListener {
                 if (!speedTesting){
-                    getResponseTimeUsingSocksProxy("https://www.google.com", "127.0.0.1", 2080)
+                    getResponseTimeUsingSocksProxy("https://www.google.com", "127.0.0.1", pref.localSocksPort)
                 }
 
                 true
@@ -299,18 +310,166 @@ class MainFragment : Fragment() {
                 }
             }
 
+            val statsInfo = fetchStatsFromHttp()
+
             withContext(Dispatchers.Main) {
                 speedTesting = false
                 speed_test_icon.clearAnimation()
 
                 view?.findViewById<TextView>(R.id.speed_result).let {
-
                     it?.setText(getString(R.string.delay_test_result, res))
+                }
+                if (!statsInfo.isNullOrBlank()) {
+                    view?.findViewById<TextView>(R.id.version_placeholder)?.let { tv ->
+                        val baseVersion = tv.text.toString().substringBefore("\n").substringBefore(" | ")
+                        tv.text = "$baseVersion\n$statsInfo"
+                    }
                 }
                 Toast.makeText(mContext, res, Toast.LENGTH_SHORT).show()
             }
 
         }
+    }
+
+    private fun fetchStatsFromHttp(): String? {
+        return try {
+            val url = URL("http://127.0.0.1:${pref.localHttpPort}/stats")
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 2000
+            conn.readTimeout = 2000
+            if (conn.responseCode == HttpURLConnection.HTTP_OK) {
+                val rawText = conn.inputStream.bufferedReader().use { it.readText() }
+                Log.d("stats", "Fetched raw stats: $rawText")
+                parseStats(rawText)
+            } else {
+                Log.e("stats", "HTTP error response code: ${conn.responseCode}")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("stats", "Failed to fetch stats: ${e.message}", e)
+            null
+        }
+    }
+
+    private fun parseStats(raw: String): String {
+        return try {
+            val json = org.json.JSONObject(raw)
+            val lineList = mutableListOf<String>()
+
+            // 1. Traffic line
+            var txStr = ""
+            var rxStr = ""
+            val txKeys = arrayOf("tx_bytes", "tx", "bytes_sent", "sent", "upload", "tx_total")
+            for (key in txKeys) {
+                if (json.has(key)) {
+                    txStr = formatBytes(json.optLong(key, 0))
+                    break
+                }
+            }
+            val rxKeys = arrayOf("rx_bytes", "rx", "bytes_recv", "received", "download", "rx_total")
+            for (key in rxKeys) {
+                if (json.has(key)) {
+                    rxStr = formatBytes(json.optLong(key, 0))
+                    break
+                }
+            }
+
+            if (txStr.isNotEmpty() || rxStr.isNotEmpty()) {
+                val trafficText = buildString {
+                    append("流量: ")
+                    if (txStr.isNotEmpty()) append("↑ $txStr")
+                    if (txStr.isNotEmpty() && rxStr.isNotEmpty()) append("  ")
+                    if (rxStr.isNotEmpty()) append("↓ $rxStr")
+                }
+                lineList.add(trafficText)
+            } else if (json.has("total_bytes") || json.has("traffic")) {
+                val total = json.optLong("total_bytes", json.optLong("traffic", 0))
+                lineList.add("总流量: ${formatBytes(total)}")
+            }
+
+            // 2. Status & Uptime line
+            val statusParts = mutableListOf<String>()
+
+            val connKeys = arrayOf("connections", "active_connections", "active_conns", "conns", "conn_count")
+            for (key in connKeys) {
+                if (json.has(key)) {
+                    statusParts.add("连接数 ${json.get(key)}")
+                    break
+                }
+            }
+
+            val reqKeys = arrayOf("total_requests", "requests", "total_conns", "req_count")
+            for (key in reqKeys) {
+                if (json.has(key)) {
+                    statusParts.add("请求数 ${json.get(key)}")
+                    break
+                }
+            }
+
+            val uptimeKeys = arrayOf("uptime", "uptime_sec", "running_time", "uptime_seconds")
+            for (key in uptimeKeys) {
+                if (json.has(key)) {
+                    val sec = json.optLong(key, 0)
+                    statusParts.add("运行时间 ${formatUptime(sec)}")
+                    break
+                }
+            }
+
+            val errKeys = arrayOf("errors", "error_count", "failed", "failed_requests")
+            for (key in errKeys) {
+                if (json.has(key)) {
+                    val errs = json.get(key)
+                    if (errs.toString() != "0") {
+                        statusParts.add("异常 $errs")
+                    }
+                    break
+                }
+            }
+
+            if (statusParts.isNotEmpty()) {
+                lineList.add("状态: " + statusParts.joinToString("  |  "))
+            }
+
+            if (lineList.isNotEmpty()) {
+                lineList.joinToString("\n")
+            } else {
+                val keys = json.keys()
+                val kvList = mutableListOf<String>()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    val v = json.get(k)
+                    val label = when (k.lowercase()) {
+                        "uptime" -> "运行时间: ${formatUptime(v.toString().toLongOrNull() ?: 0)}"
+                        "status" -> "状态: $v"
+                        else -> "$k: $v"
+                    }
+                    kvList.add(label)
+                }
+                if (kvList.isNotEmpty()) kvList.joinToString("\n") else raw.trim()
+            }
+        } catch (e: Exception) {
+            raw.trim().take(100)
+        }
+    }
+
+    private fun formatUptime(seconds: Long): String {
+        if (seconds <= 0) return "0秒"
+        val h = seconds / 3600
+        val m = (seconds % 3600) / 60
+        val s = seconds % 60
+        return when {
+            h > 0 -> "${h}小时${m}分"
+            m > 0 -> "${m}分${s}秒"
+            else -> "${s}秒"
+        }
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        if (bytes < 1024) return "$bytes B"
+        val exp = (Math.log(bytes.toDouble()) / Math.log(1024.0)).toInt()
+        val pre = "KMGTPE"[exp - 1]
+        return String.format("%.1f %sB", bytes / Math.pow(1024.0, exp.toDouble()), pre)
     }
 
 

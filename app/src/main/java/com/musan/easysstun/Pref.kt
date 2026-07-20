@@ -29,6 +29,12 @@ class Pref(private val ctx: Context) {
         get() = prefs.getBoolean(SERVICE_ENABLED, false)
         set(value) = prefs.edit { putBoolean(SERVICE_ENABLED, value) }
 
+    val localSocksPort: Int
+        get() = prefs.getString("local_socks_port", "2080")?.toIntOrNull() ?: 2080
+
+    val localHttpPort: Int
+        get() = prefs.getString("local_http_port", (localSocksPort + 1000).toString())?.toIntOrNull() ?: (localSocksPort + 1000)
+
     fun getApps(): Set<String>? {
         return prefs.getStringSet("selected_apps", HashSet<String>())
     }
@@ -137,7 +143,7 @@ class Pref(private val ctx: Context) {
             "-m", easyss_encryption,
             "-proxy-rule", easyss_proxyrule,
             "-outbound-proto", easyss_outbound,
-            "-l", "2080",
+            "-l", localSocksPort.toString(),
             "-t", "60",
             "-log-level", easyss_loglevel,
             "-enable-quic=${!(easyss_disable_quic.toBoolean())}",

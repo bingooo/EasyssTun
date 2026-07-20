@@ -45,4 +45,14 @@
     <string name="easyss_version">Easyss Core Version</string>
     <string name="easyss_direct_domains">Direct Domains &amp; IPs (one per line)</string>
     <string name="easyss_proxy_domains">Proxy Domains &amp; IPs (one per line)</string>
+    <string name="app_routing_mode">App Proxy Mode</string>
+    <string name="show_system_apps">Show System Apps</string>
+    <string name="routing_mode_bypass">Bypass Selected Apps</string>
+    <string name="routing_mode_proxy">Proxy Selected Apps Only</string>
+    <string name="proxied_app_list">Proxied %s Applications</string>
+    <string name="choose_app_to_proxy">Tap to selected PROXY applications.</string>
+    <string name="applist_title_proxy">Choose Proxy APPs</string>
+    <string name="route_desc_proxy">By default, EasyssTun will bypass LAN and its own traffic. Also, only the above selected applications will route through the VPN.\n\nAll other applications will bypass VPN.</string>
+    <string name="app_routing_mode_bypass_desc">Checked apps connect directly, others route through VPN.</string>
+    <string name="app_routing_mode_proxy_desc">Only checked apps route through VPN, others connect directly.</string>
 </resources>

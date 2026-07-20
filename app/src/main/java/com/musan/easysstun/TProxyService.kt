@@ -119,20 +119,30 @@ class TProxyService : VpnService() {
 //            if (!session.isEmpty()) session += " + "
 //            session += "IPv6"
 //        }
-        for (appName in pref.getApps()!!) {
+        val appProxyMode = pref.prefs.getString("app_proxy_mode", "bypass") ?: "bypass"
+        val selectedApps = pref.getApps() ?: emptySet()
+
+        if (appProxyMode == "proxy") {
+            for (appName in selectedApps) {
+                try {
+                    builder.addAllowedApplication(appName)
+                } catch (e: PackageManager.NameNotFoundException) {
+                }
+            }
+        } else {
+            for (appName in selectedApps) {
+                try {
+                    builder.addDisallowedApplication(appName)
+                } catch (e: PackageManager.NameNotFoundException) {
+                }
+            }
+            val selfName = applicationContext.packageName
             try {
-                builder.addDisallowedApplication(appName)
+                builder.addDisallowedApplication(selfName)
             } catch (e: PackageManager.NameNotFoundException) {
             }
         }
         session += "/per-App"
-
-
-        val selfName = applicationContext.packageName
-        try {
-            builder.addDisallowedApplication(selfName)
-        } catch (e: PackageManager.NameNotFoundException) {
-        }
 
         //test
 //        builder.addAllowedApplication("com.tencent.mm")
