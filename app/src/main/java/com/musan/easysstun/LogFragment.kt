@@ -1,5 +1,6 @@
 package com.musan.easysstun
 
+import android.net.TrafficStats
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -17,11 +18,13 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
+import java.util.Locale
 import java.util.regex.Pattern
 
 class LogFragment : Fragment() {
@@ -29,9 +32,13 @@ class LogFragment : Fragment() {
     private lateinit var logViewModel: LogViewModel
     private lateinit var logAdapter: LogAdapter
     private var logJob: Job? = null
+    private var statsJob: Job? = null
 
     private var isAtBottom = true
     private var changingState = false
+
+    private var lastRxBytes = -1L
+    private var lastTxBytes = -1L
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -86,11 +93,71 @@ class LogFragment : Fragment() {
         }
 
         readLogs()
+        startStatsTicker(view)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         logJob?.cancel()
+        statsJob?.cancel()
+    }
+
+    private fun startStatsTicker(view: View) {
+        val tvServiceStatus = view.findViewById<TextView>(R.id.tvServiceStatus)
+        val tvCoreInfo = view.findViewById<TextView>(R.id.tvCoreInfo)
+        val tvDownSpeed = view.findViewById<TextView>(R.id.tvDownSpeed)
+        val tvUpSpeed = view.findViewById<TextView>(R.id.tvUpSpeed)
+        val tvTotalTraffic = view.findViewById<TextView>(R.id.tvTotalTraffic)
+
+        val pref = Pref(requireContext())
+        val uid = android.os.Process.myUid()
+
+        statsJob = lifecycleScope.launch(Dispatchers.Main) {
+            while (isActive) {
+                val isServiceRunning = pref.isServiceEnabled
+                val easyssInfo = pref.getEasyssInfo()
+                val coreVersion = easyssInfo.coreVersion
+
+                if (isServiceRunning) {
+                    tvServiceStatus.text = "🟢 服务运行中"
+                    tvServiceStatus.setTextColor(requireContext().getColor(android.R.color.holo_green_dark))
+                    tvCoreInfo.text = if (coreVersion == "3") "Easyss v3 (AAR)" else "Easyss v2 (SO)"
+                } else {
+                    tvServiceStatus.text = "🔴 服务已停止"
+                    tvServiceStatus.setTextColor(requireContext().getColor(android.R.color.holo_red_dark))
+                    tvCoreInfo.text = if (coreVersion == "3") "Easyss v3" else "Easyss v2"
+                }
+
+                val rxBytes = TrafficStats.getUidRxBytes(uid)
+                val txBytes = TrafficStats.getUidTxBytes(uid)
+
+                val validRx = if (rxBytes != TrafficStats.UNSUPPORTED.toLong() && rxBytes >= 0) rxBytes else 0L
+                val validTx = if (txBytes != TrafficStats.UNSUPPORTED.toLong() && txBytes >= 0) txBytes else 0L
+
+                val downSpeed = if (lastRxBytes >= 0 && validRx >= lastRxBytes) validRx - lastRxBytes else 0L
+                val upSpeed = if (lastTxBytes >= 0 && validTx >= lastTxBytes) validTx - lastTxBytes else 0L
+
+                lastRxBytes = validRx
+                lastTxBytes = validTx
+
+                tvDownSpeed.text = formatSpeed(downSpeed)
+                tvUpSpeed.text = formatSpeed(upSpeed)
+                tvTotalTraffic.text = "↓ ${formatBytes(validRx)}  ↑ ${formatBytes(validTx)}"
+
+                delay(1000)
+            }
+        }
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val units = arrayOf("B", "KB", "MB", "GB", "TB")
+        val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
+        return String.format(Locale.US, "%.1f %s", bytes / Math.pow(1024.0, digitGroups.toDouble()), units[digitGroups])
+    }
+
+    private fun formatSpeed(bytesPerSec: Long): String {
+        return "${formatBytes(bytesPerSec)}/s"
     }
 
     private fun readLogs() {
