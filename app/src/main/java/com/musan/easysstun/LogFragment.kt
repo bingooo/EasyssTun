@@ -1,6 +1,5 @@
 package com.musan.easysstun
 
-import android.content.Context
 import android.net.TrafficStats
 import android.os.Bundle
 import android.util.Log
@@ -22,11 +21,20 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.regex.Pattern
+
+data class ConnectionStats(
+    val activeTcp: Int,
+    val totalTcp: Int,
+    val activeUdp: Int
+)
 
 class LogFragment : Fragment() {
     private lateinit var recyclerView: RecyclerView
@@ -42,6 +50,9 @@ class LogFragment : Fragment() {
     private var lastTxBytes = -1L
     private var peakDownSpeed = 0L
     private var peakUpSpeed = 0L
+
+    private val dnsDirectCount = AtomicInteger(0)
+    private val dnsProxyCount = AtomicInteger(0)
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -112,13 +123,14 @@ class LogFragment : Fragment() {
         val tvUpSpeed = view.findViewById<TextView>(R.id.tvUpSpeed)
         val tvPeakDown = view.findViewById<TextView>(R.id.tvPeakDown)
         val tvPeakUp = view.findViewById<TextView>(R.id.tvPeakUp)
+        val tvActiveTcp = view.findViewById<TextView>(R.id.tvActiveTcp)
+        val tvTotalTcp = view.findViewById<TextView>(R.id.tvTotalTcp)
+        val tvActiveUdp = view.findViewById<TextView>(R.id.tvActiveUdp)
+        val tvTotalConnections = view.findViewById<TextView>(R.id.tvTotalConnections)
+        val tvDnsDirect = view.findViewById<TextView>(R.id.tvDnsDirect)
+        val tvDnsProxy = view.findViewById<TextView>(R.id.tvDnsProxy)
         val tvRxTotal = view.findViewById<TextView>(R.id.tvRxTotal)
         val tvTxTotal = view.findViewById<TextView>(R.id.tvTxTotal)
-        val tvProxyRule = view.findViewById<TextView>(R.id.tvProxyRule)
-        val tvOutboundProto = view.findViewById<TextView>(R.id.tvOutboundProto)
-        val tvServerAddr = view.findViewById<TextView>(R.id.tvServerAddr)
-        val tvLocalPort = view.findViewById<TextView>(R.id.tvLocalPort)
-        val tvAppProxyCount = view.findViewById<TextView>(R.id.tvAppProxyCount)
 
         val pref = Pref(requireContext())
         val uid = android.os.Process.myUid()
@@ -162,46 +174,77 @@ class LogFragment : Fragment() {
                 tvRxTotal.text = formatBytes(validRx)
                 tvTxTotal.text = formatBytes(validTx)
 
-                // Active server and proxy config
-                val activeId = pref.prefs.getString("active_server_id", "") ?: ""
-                var serverAddrText = "未选择"
-                var proxyRuleText = "自动分流"
-                var outboundProtoText = "Native"
-
-                if (activeId.isNotBlank()) {
-                    val serverPrefs = requireContext().getSharedPreferences("server_$activeId", Context.MODE_PRIVATE)
-                    val server = serverPrefs.getString("easyss_server", "") ?: ""
-                    val port = serverPrefs.getString("easyss_serverport", "") ?: ""
-                    if (server.isNotBlank()) {
-                        serverAddrText = if (port.isNotBlank()) "$server:$port" else server
-                    }
-                    val rule = serverPrefs.getString("easyss_proxyrule", "auto") ?: "auto"
-                    proxyRuleText = when (rule) {
-                        "auto" -> "自动分流"
-                        "global" -> "全局代理"
-                        "direct" -> "直连模式"
-                        else -> rule
-                    }
-                    val outbound = serverPrefs.getString("easyss_outbound", "native") ?: "native"
-                    outboundProtoText = if (outbound.lowercase(Locale.ROOT) == "quic") "QUIC" else "Native"
+                // Socket Connection stats from /proc/net
+                val connStats = withContext(Dispatchers.IO) {
+                    getAppConnectionStats(uid)
                 }
 
-                tvServerAddr.text = serverAddrText
-                tvProxyRule.text = proxyRuleText
-                tvOutboundProto.text = outboundProtoText
-                tvLocalPort.text = "${pref.localSocksPort}"
+                tvActiveTcp.text = "${connStats.activeTcp}"
+                tvTotalTcp.text = "${connStats.totalTcp}"
+                tvActiveUdp.text = "${connStats.activeUdp}"
+                tvTotalConnections.text = "${connStats.totalTcp + connStats.activeUdp}"
 
-                val apps = pref.getApps()
-                val appProxyMode = pref.prefs.getString("app_proxy_mode", "bypass") ?: "bypass"
-                tvAppProxyCount.text = if (apps != null && apps.isNotEmpty()) {
-                    if (appProxyMode == "proxy") "代理 ${apps.size} 个" else "绕过 ${apps.size} 个"
-                } else {
-                    "全量代理"
-                }
+                // DNS Query Counters
+                tvDnsDirect.text = "${dnsDirectCount.get()}"
+                tvDnsProxy.text = "${dnsProxyCount.get()}"
 
                 delay(1000)
             }
         }
+    }
+
+    private fun getAppConnectionStats(uid: Int): ConnectionStats {
+        var activeTcp = 0
+        var totalTcp = 0
+        var activeUdp = 0
+        val uidStr = uid.toString()
+
+        fun parseTcpFile(filePath: String) {
+            try {
+                val file = File(filePath)
+                if (!file.exists()) return
+                file.forEachLine { line ->
+                    val tokens = line.trim().split(Regex("\\s+"))
+                    if (tokens.size >= 8) {
+                        val st = tokens[3]
+                        val lineUid = tokens[7]
+                        if (lineUid == uidStr) {
+                            totalTcp++
+                            if (st == "01") { // ESTABLISHED
+                                activeTcp++
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore missing file or permission restriction
+            }
+        }
+
+        fun parseUdpFile(filePath: String) {
+            try {
+                val file = File(filePath)
+                if (!file.exists()) return
+                file.forEachLine { line ->
+                    val tokens = line.trim().split(Regex("\\s+"))
+                    if (tokens.size >= 8) {
+                        val lineUid = tokens[7]
+                        if (lineUid == uidStr) {
+                            activeUdp++
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore missing file or permission restriction
+            }
+        }
+
+        parseTcpFile("/proc/net/tcp")
+        parseTcpFile("/proc/net/tcp6")
+        parseUdpFile("/proc/net/udp")
+        parseUdpFile("/proc/net/udp6")
+
+        return ConnectionStats(activeTcp, totalTcp, activeUdp)
     }
 
     private fun formatBytes(bytes: Long): String {
@@ -234,6 +277,13 @@ class LogFragment : Fragment() {
                 while (coroutineContext.isActive) {
                     val line = bufferedReader.readLine() ?: break
                     if (line.isNotBlank()) {
+                        // Count DNS Direct & Proxy queries from log stream
+                        if (line.contains("DNS_DIRECT")) {
+                            dnsDirectCount.incrementAndGet()
+                        } else if (line.contains("DNS_PROXY")) {
+                            dnsProxyCount.incrementAndGet()
+                        }
+
                         val timeMatcher = timePattern.matcher(line)
                         val timeStr = if (timeMatcher.find()) timeMatcher.group(1) else ""
 
