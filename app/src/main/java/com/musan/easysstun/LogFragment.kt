@@ -107,6 +107,7 @@ class LogFragment : Fragment() {
                 val timePattern = Pattern.compile("(\\d{2}:\\d{2}:\\d{2})\\.\\d{3}")
                 val levelPattern = Pattern.compile("level=([A-Z]+)")
                 val msgPattern = Pattern.compile("msg=\"?([^\"]+)\"?")
+                val formatBPattern = Pattern.compile("\\[\\d{4}-\\d{2}-\\d{2}\\s\\d{2}:\\d{2}:\\d{2}\\]\\s\\[([A-Z])\\]\\s(?:0x[0-9a-fA-F]+\\s)?(.*)")
 
                 while (coroutineContext.isActive) {
                     val line = bufferedReader.readLine() ?: break
@@ -114,22 +115,33 @@ class LogFragment : Fragment() {
                         val timeMatcher = timePattern.matcher(line)
                         val timeStr = if (timeMatcher.find()) timeMatcher.group(1) else ""
 
-                        val levelMatcher = levelPattern.matcher(line)
-                        val levelStr = if (levelMatcher.find()) "[${levelMatcher.group(1)}] " else ""
-
-                        val msgMatcher = msgPattern.matcher(line)
-                        val rawMessage = if (msgMatcher.find()) {
-                            msgMatcher.group(1)
-                        } else {
-                            val colonIdx = line.indexOf(':')
-                            if (colonIdx != -1 && colonIdx < line.length - 1) {
-                                line.substring(colonIdx + 1).trim()
-                            } else {
-                                line.trim()
+                        val formatBMatcher = formatBPattern.matcher(line)
+                        val cleanMessage = if (formatBMatcher.find()) {
+                            val lvl = when (formatBMatcher.group(1)) {
+                                "I" -> "[INFO]"
+                                "W" -> "[WARN]"
+                                "E" -> "[ERROR]"
+                                "D" -> "[DEBUG]"
+                                else -> "[INFO]"
                             }
-                        }
+                            "$lvl ${formatBMatcher.group(2)}"
+                        } else {
+                            val levelMatcher = levelPattern.matcher(line)
+                            val levelStr = if (levelMatcher.find()) "[${levelMatcher.group(1)}] " else ""
 
-                        val cleanMessage = "$levelStr$rawMessage".trim()
+                            val msgMatcher = msgPattern.matcher(line)
+                            val rawMessage = if (msgMatcher.find()) {
+                                msgMatcher.group(1)
+                            } else {
+                                val colonIdx = line.indexOf(':')
+                                if (colonIdx != -1 && colonIdx < line.length - 1) {
+                                    line.substring(colonIdx + 1).trim()
+                                } else {
+                                    line.trim()
+                                }
+                            }
+                            "$levelStr$rawMessage".trim()
+                        }
 
                         if (cleanMessage.isNotBlank()) {
                             val logItem = LogItem(cleanMessage, timeStr)
