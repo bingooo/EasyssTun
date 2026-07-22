@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <!-- Top Stats Card Header -->
+    <!-- Top Multi-Row Stats Card Header -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/statsCard"
         android:layout_width="match_parent"
@@ -25,6 +25,7 @@
             android:orientation="vertical"
             android:padding="14dp">
 
+            <!-- Header Row: Service Status & Core Version -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -57,6 +58,7 @@
                 android:layout_marginBottom="8dp"
                 android:background="?attr/colorOutlineVariant" />
 
+            <!-- Row 1: Real-time Speeds & Peak Speeds -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -71,7 +73,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="⬇️ 下载速率"
+                        android:text="下载速率"
                         android:textSize="11sp"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
@@ -80,7 +82,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0 B/s"
-                        android:textSize="14sp"
+                        android:textSize="13sp"
                         android:textStyle="bold"
                         android:textColor="?attr/colorPrimary" />
                 </LinearLayout>
@@ -94,7 +96,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="⬆️ 上传速率"
+                        android:text="上传速率"
                         android:textSize="11sp"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
@@ -103,7 +105,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0 B/s"
-                        android:textSize="14sp"
+                        android:textSize="13sp"
                         android:textStyle="bold"
                         android:textColor="?attr/colorPrimary" />
                 </LinearLayout>
@@ -111,23 +113,216 @@
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1.2"
+                    android:layout_weight="1"
                     android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="📦 累计流量"
+                        android:text="峰值下载"
                         android:textSize="11sp"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <TextView
-                        android:id="@+id/tvTotalTraffic"
+                        android:id="@+id/tvPeakDown"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="↓ 0 B  ↑ 0 B"
+                        android:text="0 B/s"
+                        android:textSize="13sp"
+                        android:textColor="?attr/colorOnSurface" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="峰值上传"
+                        android:textSize="11sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/tvPeakUp"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0 B/s"
+                        android:textSize="13sp"
+                        android:textColor="?attr/colorOnSurface" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Row 2: Traffic & Proxy Config -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="累计接收"
+                        android:textSize="11sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/tvRxTotal"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0 B"
                         android:textSize="12sp"
-                        android:textStyle="bold"
+                        android:textColor="?attr/colorOnSurface" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="累计发送"
+                        android:textSize="11sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/tvTxTotal"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0 B"
+                        android:textSize="12sp"
+                        android:textColor="?attr/colorOnSurface" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="分流规则"
+                        android:textSize="11sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/tvProxyRule"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="自动分流"
+                        android:textSize="12sp"
+                        android:textColor="?attr/colorOnSurface" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="出站协议"
+                        android:textSize="11sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/tvOutboundProto"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Native"
+                        android:textSize="12sp"
+                        android:textColor="?attr/colorOnSurface" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Row 3: Server Address & Local SOCKS5 & Network Type -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="2"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="当前服务器"
+                        android:textSize="11sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/tvServerAddr"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="未选择"
+                        android:textSize="12sp"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:textColor="?attr/colorOnSurface" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="本地 SOCKS5"
+                        android:textSize="11sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/tvLocalPort"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="2080"
+                        android:textSize="12sp"
+                        android:textColor="?attr/colorOnSurface" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="应用分流"
+                        android:textSize="11sp"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <TextView
+                        android:id="@+id/tvAppProxyCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="全量代理"
+                        android:textSize="12sp"
                         android:textColor="?attr/colorOnSurface" />
                 </LinearLayout>
             </LinearLayout>

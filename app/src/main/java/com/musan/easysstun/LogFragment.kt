@@ -1,5 +1,6 @@
 package com.musan.easysstun
 
+import android.content.Context
 import android.net.TrafficStats
 import android.os.Bundle
 import android.util.Log
@@ -39,6 +40,8 @@ class LogFragment : Fragment() {
 
     private var lastRxBytes = -1L
     private var lastTxBytes = -1L
+    private var peakDownSpeed = 0L
+    private var peakUpSpeed = 0L
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -107,7 +110,15 @@ class LogFragment : Fragment() {
         val tvCoreInfo = view.findViewById<TextView>(R.id.tvCoreInfo)
         val tvDownSpeed = view.findViewById<TextView>(R.id.tvDownSpeed)
         val tvUpSpeed = view.findViewById<TextView>(R.id.tvUpSpeed)
-        val tvTotalTraffic = view.findViewById<TextView>(R.id.tvTotalTraffic)
+        val tvPeakDown = view.findViewById<TextView>(R.id.tvPeakDown)
+        val tvPeakUp = view.findViewById<TextView>(R.id.tvPeakUp)
+        val tvRxTotal = view.findViewById<TextView>(R.id.tvRxTotal)
+        val tvTxTotal = view.findViewById<TextView>(R.id.tvTxTotal)
+        val tvProxyRule = view.findViewById<TextView>(R.id.tvProxyRule)
+        val tvOutboundProto = view.findViewById<TextView>(R.id.tvOutboundProto)
+        val tvServerAddr = view.findViewById<TextView>(R.id.tvServerAddr)
+        val tvLocalPort = view.findViewById<TextView>(R.id.tvLocalPort)
+        val tvAppProxyCount = view.findViewById<TextView>(R.id.tvAppProxyCount)
 
         val pref = Pref(requireContext())
         val uid = android.os.Process.myUid()
@@ -119,15 +130,16 @@ class LogFragment : Fragment() {
                 val coreVersion = easyssInfo.coreVersion
 
                 if (isServiceRunning) {
-                    tvServiceStatus.text = "🟢 服务运行中"
+                    tvServiceStatus.text = "服务状态: 运行中"
                     tvServiceStatus.setTextColor(requireContext().getColor(android.R.color.holo_green_dark))
                     tvCoreInfo.text = if (coreVersion == "3") "Easyss v3 (AAR)" else "Easyss v2 (SO)"
                 } else {
-                    tvServiceStatus.text = "🔴 服务已停止"
+                    tvServiceStatus.text = "服务状态: 已停止"
                     tvServiceStatus.setTextColor(requireContext().getColor(android.R.color.holo_red_dark))
                     tvCoreInfo.text = if (coreVersion == "3") "Easyss v3" else "Easyss v2"
                 }
 
+                // Traffic stats
                 val rxBytes = TrafficStats.getUidRxBytes(uid)
                 val txBytes = TrafficStats.getUidTxBytes(uid)
 
@@ -140,9 +152,52 @@ class LogFragment : Fragment() {
                 lastRxBytes = validRx
                 lastTxBytes = validTx
 
+                if (downSpeed > peakDownSpeed) peakDownSpeed = downSpeed
+                if (upSpeed > peakUpSpeed) peakUpSpeed = upSpeed
+
                 tvDownSpeed.text = formatSpeed(downSpeed)
                 tvUpSpeed.text = formatSpeed(upSpeed)
-                tvTotalTraffic.text = "↓ ${formatBytes(validRx)}  ↑ ${formatBytes(validTx)}"
+                tvPeakDown.text = formatSpeed(peakDownSpeed)
+                tvPeakUp.text = formatSpeed(peakUpSpeed)
+                tvRxTotal.text = formatBytes(validRx)
+                tvTxTotal.text = formatBytes(validTx)
+
+                // Active server and proxy config
+                val activeId = pref.prefs.getString("active_server_id", "") ?: ""
+                var serverAddrText = "未选择"
+                var proxyRuleText = "自动分流"
+                var outboundProtoText = "Native"
+
+                if (activeId.isNotBlank()) {
+                    val serverPrefs = requireContext().getSharedPreferences("server_$activeId", Context.MODE_PRIVATE)
+                    val server = serverPrefs.getString("easyss_server", "") ?: ""
+                    val port = serverPrefs.getString("easyss_serverport", "") ?: ""
+                    if (server.isNotBlank()) {
+                        serverAddrText = if (port.isNotBlank()) "$server:$port" else server
+                    }
+                    val rule = serverPrefs.getString("easyss_proxyrule", "auto") ?: "auto"
+                    proxyRuleText = when (rule) {
+                        "auto" -> "自动分流"
+                        "global" -> "全局代理"
+                        "direct" -> "直连模式"
+                        else -> rule
+                    }
+                    val outbound = serverPrefs.getString("easyss_outbound", "native") ?: "native"
+                    outboundProtoText = if (outbound.lowercase(Locale.ROOT) == "quic") "QUIC" else "Native"
+                }
+
+                tvServerAddr.text = serverAddrText
+                tvProxyRule.text = proxyRuleText
+                tvOutboundProto.text = outboundProtoText
+                tvLocalPort.text = "${pref.localSocksPort}"
+
+                val apps = pref.getApps()
+                val appProxyMode = pref.prefs.getString("app_proxy_mode", "bypass") ?: "bypass"
+                tvAppProxyCount.text = if (apps != null && apps.isNotEmpty()) {
+                    if (appProxyMode == "proxy") "代理 ${apps.size} 个" else "绕过 ${apps.size} 个"
+                } else {
+                    "全量代理"
+                }
 
                 delay(1000)
             }
