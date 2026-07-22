@@ -20,9 +20,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.io.BufferedReader
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStreamReader
 
 class TProxyService : VpnService() {
     private var tunFd: ParcelFileDescriptor? = null
@@ -31,6 +33,7 @@ class TProxyService : VpnService() {
     private val easyJob = Job()
     private val easyScope = CoroutineScope(Dispatchers.Default + easyJob)
     private var processEasyJob: Job? = null
+    private var v2Process: Process? = null
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
         if (ACTION_DISCONNECT == intent.action) {
@@ -78,8 +81,8 @@ class TProxyService : VpnService() {
         if (tunFd != null) return
 
         pref = Pref(this)
-        val simpleConfig = pref.getSimpleConfig()
-        if (simpleConfig == null) {
+        val easyssInfo = pref.getEasyssInfo()
+        if (!easyssInfo.valid) {
             pref.isServiceEnabled = false
             return
         }
@@ -136,15 +139,42 @@ class TProxyService : VpnService() {
             return
         }
 
-        // Launch Easyss core via libeasyss.aar Mobile.start(simpleConfig)
-        processEasyJob = easyScope.launch {
-            try {
-                val easyssVersion = Mobile.version()
-                Log.i("easyss", "Starting easyss core via Mobile.start() (version $easyssVersion)...")
-                Mobile.start(simpleConfig)
-                Log.i("easyss", "Easyss core started successfully via AAR.")
-            } catch (e: Exception) {
-                Log.e("easyss", "Mobile.start exception: ${e.message}", e)
+        // Branching according to coreVersion ("3" -> libeasyss.aar, "2" -> libeasyss.so)
+        val isV3 = (easyssInfo.coreVersion == "3")
+        if (isV3) {
+            val simpleConfig = pref.getSimpleConfig()
+            if (simpleConfig != null) {
+                processEasyJob = easyScope.launch {
+                    try {
+                        val version = Mobile.version()
+                        Log.i("easyss", "Starting Easyss v3 core via libeasyss.aar (version $version)...")
+                        Mobile.start(simpleConfig)
+                        Log.i("easyss", "Easyss v3 core started successfully via AAR.")
+                    } catch (e: Exception) {
+                        Log.e("easyss", "Mobile.start exception: ${e.message}", e)
+                    }
+                }
+            } else {
+                Log.e("easyss", "Failed to generate SimpleConfig for Easyss v3")
+            }
+        } else {
+            processEasyJob = easyScope.launch {
+                try {
+                    val libraryPath = applicationInfo.nativeLibraryDir + "/libeasyss.so"
+                    val cmdList = listOf(libraryPath) + easyssInfo.cmdList
+                    Log.i("easyss", "Starting Easyss v2 core via ProcessBuilder: $cmdList")
+                    val proc = ProcessBuilder(cmdList).directory(cacheDir).redirectErrorStream(true).start()
+                    v2Process = proc
+                    val bufferedReader = BufferedReader(InputStreamReader(proc.inputStream))
+                    while (processEasyJob?.isActive == true) {
+                        val line = bufferedReader.readLine() ?: break
+                        Log.i("easyss", line)
+                    }
+                } catch (e: Exception) {
+                    Log.e("easyss", "Easyss v2 process exception: ${e.message}", e)
+                } finally {
+                    try { v2Process?.destroy() } catch (e: Exception) {}
+                }
             }
         }
 
@@ -192,14 +222,19 @@ tunnel:
             Log.e("TProxyStopService", e.message.toString())
         }
 
-        /* Easyss Mobile AAR */
+        /* Stop Easyss Core */
         try {
             Mobile.stop()
-            processEasyJob?.cancel()
-            Log.i("easyss", "Easyss core stopped via Mobile.stop().")
         } catch (e: Exception) {
             Log.e("easyss", "Mobile.stop error: ${e.message}")
         }
+        try {
+            v2Process?.destroy()
+            v2Process = null
+        } catch (e: Exception) {
+            Log.e("easyss", "v2Process destroy error: ${e.message}")
+        }
+        processEasyJob?.cancel()
 
         /* VPN */
         try {
