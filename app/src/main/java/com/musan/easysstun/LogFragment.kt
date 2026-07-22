@@ -99,13 +99,13 @@ class LogFragment : Fragment() {
             var bufferedReader: BufferedReader? = null
             var process: Process? = null
             try {
-                // Official logcat format filtering GoLog and easyss tags
                 val cmd = arrayOf("logcat", "-v", "time", "GoLog:V", "easyss:V", "*:S")
                 process = Runtime.getRuntime().exec(cmd)
                 inputStream = process.inputStream
                 bufferedReader = BufferedReader(InputStreamReader(inputStream))
 
                 val timePattern = Pattern.compile("(\\d{2}:\\d{2}:\\d{2})\\.\\d{3}")
+                val levelPattern = Pattern.compile("level=([A-Z]+)")
                 val msgPattern = Pattern.compile("msg=\"?([^\"]+)\"?")
 
                 while (coroutineContext.isActive) {
@@ -114,8 +114,11 @@ class LogFragment : Fragment() {
                         val timeMatcher = timePattern.matcher(line)
                         val timeStr = if (timeMatcher.find()) timeMatcher.group(1) else ""
 
+                        val levelMatcher = levelPattern.matcher(line)
+                        val levelStr = if (levelMatcher.find()) "[${levelMatcher.group(1)}] " else ""
+
                         val msgMatcher = msgPattern.matcher(line)
-                        val messageStr = if (msgMatcher.find()) {
+                        val rawMessage = if (msgMatcher.find()) {
                             msgMatcher.group(1)
                         } else {
                             val colonIdx = line.indexOf(':')
@@ -126,8 +129,10 @@ class LogFragment : Fragment() {
                             }
                         }
 
-                        if (messageStr.isNotBlank()) {
-                            val logItem = LogItem(messageStr, timeStr)
+                        val cleanMessage = "$levelStr$rawMessage".trim()
+
+                        if (cleanMessage.isNotBlank()) {
+                            val logItem = LogItem(cleanMessage, timeStr)
                             logViewModel.addLog(logItem)
                         }
                     }
