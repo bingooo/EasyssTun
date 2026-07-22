@@ -55,6 +55,7 @@ android {
         debug {
             resValue "string", "app_name", "EasyssTun (Debug)"
             applicationIdSuffix ".debug"
+            versionNameSuffix "-DEBUG"
         }
         release {
             resValue "string", "app_name", "EasyssTun"
