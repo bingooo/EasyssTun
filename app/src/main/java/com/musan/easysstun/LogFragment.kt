@@ -112,7 +112,7 @@ class LogFragment : Fragment() {
 //                process = ProcessBuilder("logcat", "-c").start()
                 var cleanprocess = Runtime.getRuntime().exec("logcat -c")
                 cleanprocess.waitFor();
-                process = Runtime.getRuntime().exec("logcat -s easyss")
+                process = Runtime.getRuntime().exec("logcat -s easyss GoLog")
                 inputStream = process.inputStream
                 bufferedReader = BufferedReader(InputStreamReader(inputStream))
                 while (!logJob?.isCancelled!!) {
