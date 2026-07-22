@@ -164,32 +164,36 @@ class MainFragment : Fragment() {
     private inner class GitTagTask(private val rootView: View, private val context: Context, private val coreVersion: String) : AsyncTask<Void, Void, String>() {
 
         override fun doInBackground(vararg params: Void): String {
-            val libName = if (coreVersion == "3") "/libeasyss3.so" else "/libeasyss.so"
-            val libraryPath = context.applicationInfo.nativeLibraryDir.toString() + libName
-            val command = listOf(libraryPath, "--version")
-            val processBuilder = ProcessBuilder(command)
-            processBuilder.redirectErrorStream(true)
-
-            val process = processBuilder.start()
-
-            val reader = BufferedReader(InputStreamReader(process.inputStream))
-            var line: String?
-            val label = if (coreVersion == "3") "Easyss v3" else "Easyss v2"
-            var gitTag = label
-            var versionFound = false
-            while (reader.readLine().also { line = it } != null) {
-                if (line!!.startsWith("Git tag:")) {
-                    gitTag += ": " + line!!.substringAfter(":").trim()
-                    versionFound = true
-                    break
+            if (coreVersion == "3") {
+                return try {
+                    "Easyss v3: " + io.github.nange.easyss.mobile.Mobile.version()
+                } catch (e: Exception) {
+                    "Easyss v3"
                 }
             }
 
-            process.waitFor()
-            if (!versionFound) {
-                gitTag = if (coreVersion == "3") "Easyss v3: v3.0.0-rc5" else "Easyss v2: v2.7.3"
+            return try {
+                val libraryPath = context.applicationInfo.nativeLibraryDir.toString() + "/libeasyss.so"
+                val command = listOf(libraryPath, "--version")
+                val processBuilder = ProcessBuilder(command).redirectErrorStream(true)
+                val process = processBuilder.start()
+
+                val reader = BufferedReader(InputStreamReader(process.inputStream))
+                var line: String?
+                var gitTag = "Easyss v2"
+                var versionFound = false
+                while (reader.readLine().also { line = it } != null) {
+                    if (line!!.startsWith("Git tag:")) {
+                        gitTag += ": " + line!!.substringAfter(":").trim()
+                        versionFound = true
+                        break
+                    }
+                }
+                process.waitFor()
+                if (!versionFound) "Easyss v2: v2.7.3" else gitTag
+            } catch (e: Exception) {
+                "Easyss v2: v2.7.3"
             }
-            return gitTag
         }
 
         override fun onPostExecute(gitTag: String) {
