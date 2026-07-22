@@ -8,23 +8,21 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
-import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.content.edit
+import io.github.nange.easyss.mobile.Mobile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import java.io.BufferedReader
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
-import java.io.InputStreamReader
-import android.content.pm.ServiceInfo;
 
 class TProxyService : VpnService() {
     private var tunFd: ParcelFileDescriptor? = null
@@ -32,8 +30,7 @@ class TProxyService : VpnService() {
     private lateinit var pref: Pref
     private val easyJob = Job()
     private val easyScope = CoroutineScope(Dispatchers.Default + easyJob)
-    private lateinit var processEasyJob: Job
-    lateinit var process: Process
+    private var processEasyJob: Job? = null
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
         if (ACTION_DISCONNECT == intent.action) {
@@ -81,8 +78,8 @@ class TProxyService : VpnService() {
         if (tunFd != null) return
 
         pref = Pref(this)
-        var easyssInfo = pref.getEasyssInfo()
-        if (!easyssInfo.valid){
+        val simpleConfig = pref.getSimpleConfig()
+        if (simpleConfig == null) {
             pref.isServiceEnabled = false
             return
         }
@@ -99,26 +96,14 @@ class TProxyService : VpnService() {
 
         builder.addAddress("198.18.0.1", 32)
         builder.addDnsServer("1.0.0.1")
-//        builder.addRoute("192.168.17.1", 32)
 
         resources.getStringArray(R.array.bypass_private_route).forEach {
             val parts = it.split('/', limit = 2)
             builder.addRoute(parts[0], parts[1].toInt())
         }
-//        builder.addRoute("0.0.0.0", 0)
 
         session += "IPv4"
 
-//        if (prefs.getIpv6()) {
-//            val addr: String = prefs.getTunnelIpv6Address()
-//            val prefix: Int = prefs.getTunnelIpv6Prefix()
-//            val dns: String = prefs.getDnsIpv6()
-//            builder.addAddress(addr, prefix)
-//            builder.addRoute("::", 0)
-//            if (!dns.isEmpty()) builder.addDnsServer(dns)
-//            if (!session.isEmpty()) session += " + "
-//            session += "IPv6"
-//        }
         val appProxyMode = pref.prefs.getString("app_proxy_mode", "bypass") ?: "bypass"
         val selectedApps = pref.getApps() ?: emptySet()
 
@@ -144,9 +129,6 @@ class TProxyService : VpnService() {
         }
         session += "/per-App"
 
-        //test
-//        builder.addAllowedApplication("com.tencent.mm")
-
         builder.setSession(session)
         tunFd = builder.establish()
         if (tunFd == null) {
@@ -154,54 +136,17 @@ class TProxyService : VpnService() {
             return
         }
 
+        // Launch Easyss core via libeasyss.aar Mobile.start(simpleConfig)
         processEasyJob = easyScope.launch {
-            while (true) {
-
-                try {
-                    val libName = if (easyssInfo.coreVersion == "3") "/libeasyss3.so" else "/libeasyss.so"
-                    val libraryPath = applicationInfo.nativeLibraryDir.toString() + libName
-                    var cmdList = listOf(libraryPath) + easyssInfo.cmdList
-                    Log.i("easyss", cmdList.toString())
-                    process = ProcessBuilder(cmdList).directory(cacheDir).start()
-
-                    Log.d("easyss", "msg=[EasyssTun] Connected to the service successfully.")
-                    val bufferedReader =
-                        BufferedReader(InputStreamReader(process.inputStream))
-
-                    while (!processEasyJob.isCancelled) {
-                        var line: String = bufferedReader.readLine()
-                        if (line != null) {
-                            Log.i("easyss", line)
-                        }
-                    }
-
-//                    while (isActive) {
-//                        if (bufferedReader.ready()) {
-//                            val line = bufferedReader.readLine()
-//                            if (line != null) {
-//                                Log.i("easyss", line)
-//                            }
-//                        } else {
-//                            delay(100)
-//                        }
-//                    }
-                } catch (e: IOException) {
-                    Log.e("easyss", "msg=[EasyssTun] IOException: " + e.message)
-                } catch (e: InterruptedException) {
-                    Log.e("easyss", "msg=[EasyssTun] InterruptedException: " + e.message)
-                }
-
-                finally {
-                    process.destroy()
-                    val exitCode = process.waitFor()
-                    Log.i("easyss", "msg=[EasyssTun] Command exited with code: $exitCode")
-                    break
-                }
-
+            try {
+                val easyssVersion = Mobile.version()
+                Log.i("easyss", "Starting easyss core via Mobile.start() (version $easyssVersion)...")
+                Mobile.start(simpleConfig)
+                Log.i("easyss", "Easyss core started successfully via AAR.")
+            } catch (e: Exception) {
+                Log.e("easyss", "Mobile.start exception: ${e.message}", e)
             }
         }
-
-
 
         /* TProxy */
         val tproxy_file = File(cacheDir, "tproxy.conf")
@@ -220,7 +165,7 @@ tunnel:
   mtu: 8500
 """
             tproxy_conf += """socks5:
-  port: ${pref.prefs.getString("socks_port", "2080")?.toInt()}
+  port: ${pref.localSocksPort}
   address: '127.0.0.1'
   udp: 'udp'
 """
@@ -246,15 +191,16 @@ tunnel:
         } catch (e: Exception) {
             Log.e("TProxyStopService", e.message.toString())
         }
-        try {
 
-            process.destroy()
-            processEasyJob.cancel()
-//            val exitCode = process.waitFor()
-//            Log.i("easyss", "msg=[EasyssTun] Command exited with code: $exitCode")
+        /* Easyss Mobile AAR */
+        try {
+            Mobile.stop()
+            processEasyJob?.cancel()
+            Log.i("easyss", "Easyss core stopped via Mobile.stop().")
         } catch (e: Exception) {
-            Log.e("easyJob", e.message.toString())
+            Log.e("easyss", "Mobile.stop error: ${e.message}")
         }
+
         /* VPN */
         try {
             tunFd!!.close()
@@ -279,13 +225,12 @@ tunnel:
             .setContentIntent(pi)
             .build()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(1, notify);
+            startForeground(1, notify)
         } else {
-            startForeground(1, notify, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            startForeground(1, notify, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         }
     }
 
-    //     create NotificationChannel
     private fun initNotificationChannel(channelName: String) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
@@ -293,10 +238,8 @@ tunnel:
             val channel =
                 NotificationChannel(channelName, name, NotificationManager.IMPORTANCE_LOW)
             notificationManager.createNotificationChannel(channel)
-
         }
     }
-
 
     companion object {
         @JvmStatic

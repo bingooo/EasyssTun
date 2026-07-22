@@ -1,7 +1,10 @@
 package com.musan.easysstun
+
 import android.content.Context
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
+import io.github.nange.easyss.config.Config
+import io.github.nange.easyss.config.SimpleConfig
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -102,6 +105,84 @@ class Pref(private val ctx: Context) {
                 prefs.edit().putString("active_server_id", newId).apply()
             }
         }
+    }
+
+    fun getSimpleConfig(): SimpleConfig? {
+        migrateIfNeeded()
+
+        val activeId = prefs.getString("active_server_id", "")
+        if (activeId.isNullOrBlank()) {
+            return null
+        }
+
+        val serverPrefs = ctx.getSharedPreferences("server_$activeId", Context.MODE_PRIVATE)
+
+        val server = serverPrefs.getString("easyss_server", "") ?: ""
+        val serverPortStr = serverPrefs.getString("easyss_serverport", "") ?: ""
+        val password = serverPrefs.getString("easyss_password", "") ?: ""
+
+        if (server.isBlank() || serverPortStr.isBlank() || password.isBlank()) {
+            return null
+        }
+
+        val encryption = serverPrefs.getString("easyss_encryption", "chacha20-poly1305") ?: "chacha20-poly1305"
+        val proxyrule = serverPrefs.getString("easyss_proxyrule", "auto") ?: "auto"
+        val outbound = serverPrefs.getString("easyss_outbound", "native") ?: "native"
+        val loglevel = serverPrefs.getString("easyss_loglevel", "info") ?: "info"
+        val disableQuic = serverPrefs.getString("easyss_disable_quic", "false") ?: "false"
+        val customCa = serverPrefs.getString("easyss_custom_ca", "")
+
+        val simpleConfig = Config.newSimpleConfig()
+        simpleConfig.server = server
+        simpleConfig.serverPort = serverPortStr.toLongOrNull() ?: 8882L
+        simpleConfig.password = password
+        simpleConfig.method = encryption
+        simpleConfig.localPort = localSocksPort.toLong()
+        simpleConfig.httpPort = localHttpPort.toLong()
+        simpleConfig.proxyRule = proxyrule
+        simpleConfig.outboundProto = outbound
+        simpleConfig.logLevel = loglevel
+        simpleConfig.enableQUIC = !disableQuic.toBoolean()
+        simpleConfig.disableSysProxy = true
+        simpleConfig.bindAll = false
+        simpleConfig.enableForwardDNS = false
+        simpleConfig.enableTun2socks = false
+        simpleConfig.timeout = 60L
+
+        if (!customCa.isNullOrBlank()) {
+            val caFile = File(ctx.cacheDir, "easyss_custom_ca.conf")
+            try {
+                caFile.writeText(customCa)
+                simpleConfig.caPath = caFile.absolutePath
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        val directDomains = serverPrefs.getString("easyss_direct_domains", "") ?: ""
+        val proxyDomains = serverPrefs.getString("easyss_proxy_domains", "") ?: ""
+
+        if (directDomains.isNotBlank()) {
+            val directFile = File(ctx.cacheDir, "direct_$activeId.txt")
+            try {
+                directFile.writeText(directDomains)
+                simpleConfig.directFile = directFile.absolutePath
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        if (proxyDomains.isNotBlank()) {
+            val proxyFile = File(ctx.cacheDir, "proxy_$activeId.txt")
+            try {
+                proxyFile.writeText(proxyDomains)
+                simpleConfig.proxyFile = proxyFile.absolutePath
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        return simpleConfig
     }
 
     fun getEasyssInfo(): easyssInfo {
