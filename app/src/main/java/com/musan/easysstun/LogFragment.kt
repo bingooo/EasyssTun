@@ -1,6 +1,7 @@
 package com.musan.easysstun
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -16,12 +17,12 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.util.regex.Pattern
-
 
 class LogFragment : Fragment() {
     private lateinit var recyclerView: RecyclerView
@@ -32,7 +33,6 @@ class LogFragment : Fragment() {
     private var isAtBottom = true
     private var changingState = false
 
-
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -41,25 +41,17 @@ class LogFragment : Fragment() {
         return inflater.inflate(R.layout.fragment_log, container, false)
     }
 
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         recyclerView = view.findViewById(R.id.logRecyclerView)
         logAdapter = LogAdapter()
 
-
-        // 设置布局管理器
         val layoutManager = LinearLayoutManager(requireContext())
         recyclerView.layoutManager = layoutManager
-
-//        val dividerItemDecoration = DividerItemDecoration(requireContext(), layoutManager.orientation)
-//        dividerItemDecoration.setDrawable(ContextCompat.getDrawable(requireContext(), R.drawable.divider_drawable)!!)
-//        recyclerView.addItemDecoration(dividerItemDecoration)
         recyclerView.recycledViewPool.setMaxRecycledViews(0, 50)
         recyclerView.adapter = logAdapter
         logViewModel = ViewModelProvider(this).get(LogViewModel::class.java)
 
-        // 观察LiveData以更新RecyclerView
         logViewModel.logItems.observe(viewLifecycleOwner) { logItems ->
             changingState = true
             logAdapter.submitList(logItems)
@@ -70,20 +62,17 @@ class LogFragment : Fragment() {
             changingState = false
         }
 
-        var fabToBotton = view.findViewById<FloatingActionButton>(R.id.fabToBotton)
+        val fabToBotton = view.findViewById<FloatingActionButton>(R.id.fabToBotton)
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
-//                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
-                    if (changingState)
-                        return
-                    if (!recyclerView.canScrollVertically(1)) {
-                        isAtBottom = true
-                        fabToBotton.hide()
-                    } else {
-                        isAtBottom = false
-                        fabToBotton.show()
-                    }
-//                }
+                if (changingState) return
+                if (!recyclerView.canScrollVertically(1)) {
+                    isAtBottom = true
+                    fabToBotton.hide()
+                } else {
+                    isAtBottom = false
+                    fabToBotton.show()
+                }
             }
         })
 
@@ -96,50 +85,63 @@ class LogFragment : Fragment() {
             }
         }
 
-
         readLogs()
     }
+
     override fun onDestroy() {
         super.onDestroy()
         logJob?.cancel()
     }
+
     private fun readLogs() {
         logJob = lifecycleScope.launch(Dispatchers.IO) {
             var inputStream: InputStream? = null
             var bufferedReader: BufferedReader? = null
             var process: Process? = null
             try {
-//                process = ProcessBuilder("logcat", "-c").start()
-                var cleanprocess = Runtime.getRuntime().exec("logcat -c")
-                cleanprocess.waitFor();
-                process = Runtime.getRuntime().exec("logcat -s easyss GoLog")
+                // Official logcat format filtering GoLog and easyss tags
+                val cmd = arrayOf("logcat", "-v", "time", "GoLog:V", "easyss:V", "*:S")
+                process = Runtime.getRuntime().exec(cmd)
                 inputStream = process.inputStream
                 bufferedReader = BufferedReader(InputStreamReader(inputStream))
-                while (!logJob?.isCancelled!!) {
-                    var line: String = bufferedReader.readLine()
-                    if (line != null) {
-                        val pattern =
-                            Pattern.compile("\\s(\\d{2}:\\d{2}:\\d{2})\\.\\d{3}.*msg=(.*)")
-                        val matcher = pattern.matcher(line)
-                        if (matcher.find()) {
-                            val timestampString = matcher.group(1)
-                            val msg = matcher.group(2)
-                            val logItem = LogItem(msg, timestampString)
+
+                val timePattern = Pattern.compile("(\\d{2}:\\d{2}:\\d{2})\\.\\d{3}")
+                val msgPattern = Pattern.compile("msg=\"?([^\"]+)\"?")
+
+                while (coroutineContext.isActive) {
+                    val line = bufferedReader.readLine() ?: break
+                    if (line.isNotBlank()) {
+                        val timeMatcher = timePattern.matcher(line)
+                        val timeStr = if (timeMatcher.find()) timeMatcher.group(1) else ""
+
+                        val msgMatcher = msgPattern.matcher(line)
+                        val messageStr = if (msgMatcher.find()) {
+                            msgMatcher.group(1)
+                        } else {
+                            val colonIdx = line.indexOf(':')
+                            if (colonIdx != -1 && colonIdx < line.length - 1) {
+                                line.substring(colonIdx + 1).trim()
+                            } else {
+                                line.trim()
+                            }
+                        }
+
+                        if (messageStr.isNotBlank()) {
+                            val logItem = LogItem(messageStr, timeStr)
                             logViewModel.addLog(logItem)
                         }
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e("LogFragment", "Error reading logcat logs: ${e.message}", e)
             } finally {
-                inputStream?.close()
-                bufferedReader?.close()
-                process?.destroy()
+                try { inputStream?.close() } catch (e: Exception) {}
+                try { bufferedReader?.close() } catch (e: Exception) {}
+                try { process?.destroy() } catch (e: Exception) {}
             }
         }
     }
 }
-
 
 class LogAdapter : RecyclerView.Adapter<LogAdapter.LogViewHolder>() {
     private var logItems: List<LogItem> = emptyList()
@@ -175,7 +177,6 @@ class LogAdapter : RecyclerView.Adapter<LogAdapter.LogViewHolder>() {
         }
     }
 }
-
 
 data class LogItem(val message: String, var time: String)
 
