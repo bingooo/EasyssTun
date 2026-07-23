@@ -40,6 +40,8 @@ type TSNetNode struct {
 	dnsSuffix string
 	lastErr   error
 	cancel    context.CancelFunc
+	readyCh   chan struct{}
+	readyOnce sync.Once
 }
 
 func init() {
@@ -89,6 +91,7 @@ func NewTSNetNode(hostname, authKey, controlURL, stateDir string, matcher *IPMat
 		server:  srv,
 		matcher: matcher,
 		state:   "Stopped",
+		readyCh: make(chan struct{}),
 	}
 }
 
@@ -215,24 +218,29 @@ func (n *TSNetNode) updateStatusOnce(ctx context.Context) {
 							prefixes = append(prefixes, pfx)
 						}
 					}
-					// 2. Add advertised/approved Subnet routes from PrimaryRoutes (ignoring local LAN overlap)
+					// 2. Add advertised/approved Subnet routes from AllowedIPs and PrimaryRoutes (ignoring local LAN overlap)
+					var routesToCollect []netip.Prefix
 					if peer.PrimaryRoutes != nil {
-						for _, pfx := range peer.PrimaryRoutes.AsSlice() {
-							if pfx.Bits() == 0 {
-								continue // Filter out default exit nodes (0.0.0.0/0, ::/0)
+						routesToCollect = append(routesToCollect, peer.PrimaryRoutes.AsSlice()...)
+					}
+					if peer.AllowedIPs != nil {
+						routesToCollect = append(routesToCollect, peer.AllowedIPs.AsSlice()...)
+					}
+					for _, pfx := range routesToCollect {
+						if pfx.Bits() == 0 {
+							continue // Filter out default exit nodes (0.0.0.0/0, ::/0)
+						}
+						// Check if this Subnet overlaps with any current local physical LAN IP
+						isLocalOverlap := false
+						for _, localIP := range localIPs {
+							if pfx.Contains(localIP) {
+								isLocalOverlap = true
+								log.Printf("[TSNetNode] Subnet route %s overlaps with local physical LAN IP %s, bypassing Tailnet for this subnet", pfx.String(), localIP.String())
+								break
 							}
-							// Check if this Subnet overlaps with any current local physical LAN IP
-							isLocalOverlap := false
-							for _, localIP := range localIPs {
-								if pfx.Contains(localIP) {
-									isLocalOverlap = true
-									log.Printf("[TSNetNode] Subnet route %s overlaps with local physical LAN IP %s, bypassing Tailnet for this subnet", pfx.String(), localIP.String())
-									break
-								}
-							}
-							if !isLocalOverlap {
-								prefixes = append(prefixes, pfx)
-							}
+						}
+						if !isLocalOverlap {
+							prefixes = append(prefixes, pfx)
 						}
 					}
 				}
@@ -241,6 +249,11 @@ func (n *TSNetNode) updateStatusOnce(ctx context.Context) {
 
 			if st.MagicDNSSuffix != "" {
 				n.dnsSuffix = st.MagicDNSSuffix
+			}
+			if st.BackendState == "Running" {
+				n.readyOnce.Do(func() {
+					close(n.readyCh)
+				})
 			}
 			n.mu.Unlock()
 }
@@ -270,6 +283,19 @@ func (n *TSNetNode) IsReady() bool {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 	return n.state == "Running"
+}
+
+// WaitReady blocks until the node is in Running state or ctx is cancelled.
+func (n *TSNetNode) WaitReady(ctx context.Context) error {
+	if n.IsReady() {
+		return nil
+	}
+	select {
+	case <-n.readyCh:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // GetStatusJSON returns JSON representation of current status.

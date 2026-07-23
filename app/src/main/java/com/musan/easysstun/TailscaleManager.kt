@@ -47,6 +47,12 @@ object TailscaleManager {
             ?.getString(KEY_STATUS_JSON, "{\"state\":\"Stopped\"}") ?: "{\"state\":\"Stopped\"}"
     }
 
+    private var lastRouterPort: Int = 10800
+    private var lastEasyssPort: Int = 2080
+    private var lastAuthKey: String = ""
+    private var lastControlUrl: String = ""
+    private var lastHostname: String = ""
+
     @Synchronized
     fun start(
         context: Context,
@@ -57,6 +63,12 @@ object TailscaleManager {
         hostname: String
     ): Boolean {
         appContext = context.applicationContext
+        lastRouterPort = routerPort
+        lastEasyssPort = easyssPort
+        lastAuthKey = authKey
+        lastControlUrl = controlUrl
+        lastHostname = hostname
+
         if (process != null) {
             Log.d(TAG, "tsrouter process is already running.")
             return true
@@ -111,8 +123,21 @@ object TailscaleManager {
                                             subnetsList.add(subnetsArr.getString(i))
                                         }
                                     }
-                                    appContext?.getSharedPreferences(PREFS_NAME, MODE_PRIVATE or Context.MODE_MULTI_PROCESS)
-                                        ?.edit()?.putString("active_subnets", subnetsList.joinToString(","))?.apply()
+                                    val prefs = appContext?.getSharedPreferences(PREFS_NAME, MODE_PRIVATE or Context.MODE_MULTI_PROCESS)
+                                    val oldSubnets = prefs?.getString("active_subnets", "") ?: ""
+                                    val newSubnetsStr = subnetsList.joinToString(",")
+                                    if (oldSubnets != newSubnetsStr) {
+                                        prefs?.edit()?.putString("active_subnets", newSubnetsStr)?.apply()
+                                        if (newSubnetsStr.isNotEmpty()) {
+                                            Log.i(TAG, "Subnets changed ($oldSubnets -> $newSubnetsStr), notifying TProxyService to reload TUN routes")
+                                            appContext?.let { ctx ->
+                                                val intent = android.content.Intent(ctx, TProxyService::class.java).apply {
+                                                    action = "RELOAD_TUN_ROUTES"
+                                                }
+                                                ctx.startService(intent)
+                                            }
+                                        }
+                                    }
                                 } catch (_: Exception) {}
                             }
                         }
@@ -121,6 +146,15 @@ object TailscaleManager {
                     Log.e(TAG, "Error reading tsrouter output: ${e.message}")
                 } finally {
                     Log.i(TAG, "tsrouter sub-process output loop ended.")
+                    process = null
+                    // If service was killed unexpectedly (e.g. by Phantom Process Killer), auto restart if context is valid
+                    if (processJob?.isActive == true) {
+                        Log.w(TAG, "tsrouter process died unexpectedly, auto restarting in 1s...")
+                        kotlinx.coroutines.delay(1000)
+                        appContext?.let { ctx ->
+                            start(ctx, lastRouterPort, lastEasyssPort, lastAuthKey, lastControlUrl, lastHostname)
+                        }
+                    }
                 }
             }
 

@@ -36,8 +36,20 @@ class TProxyService : VpnService() {
     private var v2Process: Process? = null
     private var startServiceJob: Job? = null
 
-    override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
-        if (ACTION_DISCONNECT == intent.action) {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if ("RELOAD_TUN_ROUTES" == intent?.action) {
+            Log.i("TProxyService", "Reloading TUN session to apply updated Tailscale Subnet routes...")
+            startServiceJob?.cancel()
+            startServiceJob = easyScope.launch(Dispatchers.IO) {
+                try {
+                    reloadTunOnly()
+                } catch (e: Exception) {
+                    Log.e("TProxyService", "Failed to reload TUN session: ${e.message}")
+                }
+            }
+            return START_STICKY
+        }
+        if (ACTION_DISCONNECT == intent?.action) {
             stopService()
             return START_NOT_STICKY
         }
@@ -214,8 +226,7 @@ class TProxyService : VpnService() {
                 }
             }
         }
-
-        // If Tailscale enabled, start tsrouter
+        // Start Tailscale tsrouter process if enabled
         val targetTProxyPort = if (isTailscaleEnabled) {
             val success = TailscaleManager.start(
                 context = this,
@@ -261,6 +272,17 @@ tunnel:
         val channelName = "easysstun"
         initNotificationChannel(channelName)
         createNotification(channelName)
+    }
+
+    private fun reloadTunOnly() {
+        if (tunFd == null) return
+        Log.i("TProxyService", "Closing existing TUN fd and stopping hev-socks5-tunnel...")
+        try { TProxyStopService() } catch (_: Exception) {}
+        try { tunFd?.close() } catch (_: Exception) {}
+        tunFd = null
+
+        Log.i("TProxyService", "Rebuilding VPN Builder routes with updated subnets...")
+        startService()
     }
 
     fun stopService() {

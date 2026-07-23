@@ -155,12 +155,23 @@ func (s *SOCKS5Server) handleConnect(ctx context.Context, clientConn net.Conn, h
 
 	if isTailnet {
 		log.Printf("[Router] Target %s -> TAILSCALE", targetAddr)
-		for i := 0; i < 20 && !s.tsNode.IsReady(); i++ {
-			time.Sleep(200 * time.Millisecond)
+		if !s.tsNode.IsReady() {
+			waitCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+			_ = s.tsNode.WaitReady(waitCtx)
+			cancel()
 		}
 		targetConn, err = s.tsNode.Dial(ctx, "tcp", targetAddr)
+	} else if isPrivateHost(host) {
+		// Private host (e.g. 192.168.x.x) not yet matched in matcher:
+		// Try tsNode first (in case it is an unlisted Subnet route), then fallback to EASYSS.
+		log.Printf("[Router] Target %s is private IP, trying TAILSCALE first...", targetAddr)
+		targetConn, err = s.tsNode.Dial(ctx, "tcp", targetAddr)
+		if err != nil {
+			log.Printf("[Router] TAILSCALE dial for private %s failed (%v), falling back to EASYSS", targetAddr, err)
+			targetConn, err = s.socksClient.Dial("tcp", targetAddr)
+		}
 	} else {
-		log.Printf("[Router] Target %s -> EASYSS", targetAddr)
+		log.Printf("[Router] Target %s -> EASYSS (Public)", targetAddr)
 		targetConn, err = s.socksClient.Dial("tcp", targetAddr)
 	}
 
@@ -289,11 +300,22 @@ func (s *SOCKS5Server) handleUDPAssociate(ctx context.Context, clientConn net.Co
 					localUDP.WriteToUDP(buf[:n], ca)
 				}
 			} else {
-				// client → upstream
+				// client → upstream or tsnet
 				mu.Lock()
 				clientAddr = src
 				mu.Unlock()
-				localUDP.WriteToUDP(buf[:n], upstreamUDPAddr)
+
+				// Parse SOCKS5 UDP header: RSV(2) + FRAG(1) + ATYP(1) + ADDR + PORT(2)
+				targetHost := extractSocks5UDPTarget(buf[:n])
+				if targetHost != "" && s.matcher.IsTailnet(targetHost) {
+					// Tailnet UDP packet -> Dial via tsnet in goroutine
+					go func(data []byte) {
+						s.proxyTailnetUDP(ctx, localUDP, src, data)
+					}(append([]byte(nil), buf[:n]...))
+				} else {
+					// Non-tailnet UDP packet -> forward to Easyss SOCKS5 upstream
+					localUDP.WriteToUDP(buf[:n], upstreamUDPAddr)
+				}
 			}
 		}
 	}()
@@ -364,4 +386,97 @@ func isPrivateHost(host string) bool {
 		return false
 	}
 	return ip.IsPrivate()
+}
+
+// extractSocks5UDPTarget parses the target address from a SOCKS5 UDP request frame header.
+func extractSocks5UDPTarget(data []byte) string {
+	if len(data) < 10 {
+		return ""
+	}
+	atyp := data[3]
+	var host string
+	var headerLen int
+
+	switch atyp {
+	case 0x01: // IPv4
+		if len(data) < 10 {
+			return ""
+		}
+		host = net.IP(data[4:8]).String()
+		headerLen = 10
+	case 0x03: // Domain
+		domainLen := int(data[4])
+		if len(data) < 5+domainLen+2 {
+			return ""
+		}
+		host = string(data[5 : 5+domainLen])
+		headerLen = 5 + domainLen + 2
+	case 0x04: // IPv6
+		if len(data) < 22 {
+			return ""
+		}
+		host = net.IP(data[4:20]).String()
+		headerLen = 22
+	default:
+		return ""
+	}
+	_ = headerLen
+	return host
+}
+
+// proxyTailnetUDP dials target via tsnet and relays the UDP packet payload back.
+func (s *SOCKS5Server) proxyTailnetUDP(ctx context.Context, localUDP *net.UDPConn, clientAddr *net.UDPAddr, frameData []byte) {
+	if len(frameData) < 10 {
+		return
+	}
+	atyp := frameData[3]
+	var host string
+	var port int
+	var payloadOffset int
+
+	switch atyp {
+	case 0x01:
+		host = net.IP(frameData[4:8]).String()
+		port = int(frameData[8])<<8 | int(frameData[9])
+		payloadOffset = 10
+	case 0x03:
+		dLen := int(frameData[4])
+		host = string(frameData[5 : 5+dLen])
+		port = int(frameData[5+dLen])<<8 | int(frameData[5+dLen+1])
+		payloadOffset = 5 + dLen + 2
+	case 0x04:
+		host = net.IP(frameData[4:20]).String()
+		port = int(frameData[20])<<8 | int(frameData[21])
+		payloadOffset = 22
+	default:
+		return
+	}
+
+	targetAddr := net.JoinHostPort(host, strconv.Itoa(port))
+	uConn, err := s.tsNode.Dial(ctx, "udp", targetAddr)
+	if err != nil {
+		log.Printf("[UDP] Dial tsnet UDP %s failed: %v", targetAddr, err)
+		return
+	}
+	defer uConn.Close()
+
+	// Write payload to tsnet UDP connection
+	if _, err := uConn.Write(frameData[payloadOffset:]); err != nil {
+		return
+	}
+
+	// Read response from tsnet and wrap back into SOCKS5 UDP frame for client
+	respBuf := make([]byte, 65535)
+	uConn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	rn, err := uConn.Read(respBuf)
+	if err != nil || rn == 0 {
+		return
+	}
+
+	// Wrap original SOCKS5 UDP header + response payload
+	replyFrame := make([]byte, payloadOffset+rn)
+	copy(replyFrame[:payloadOffset], frameData[:payloadOffset])
+	copy(replyFrame[payloadOffset:], respBuf[:rn])
+
+	localUDP.WriteToUDP(replyFrame, clientAddr)
 }
