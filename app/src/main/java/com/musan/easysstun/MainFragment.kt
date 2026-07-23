@@ -147,6 +147,10 @@ class MainFragment : Fragment() {
             }
         }
 
+        view.findViewById<View>(R.id.tailscale_card)?.setOnClickListener {
+            findNavController().navigate(R.id.action_main_to_tailscale)
+        }
+
         speed_test_icon = view.findViewById<ImageView>(R.id.speed_test_icon)
         initRotateAnimation()
 

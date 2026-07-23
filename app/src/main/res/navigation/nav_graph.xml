@@ -52,6 +52,16 @@
         <action
             android:id="@+id/action_main_to_log"
             app:destination="@+id/LogFragment" />
+
+        <action
+            android:id="@+id/action_main_to_tailscale"
+            app:destination="@+id/TailscaleFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/TailscaleFragment"
+        android:name="com.musan.easysstun.TailscaleFragment"
+        android:label="Tailscale 配置">
     </fragment>
 
 </navigation>

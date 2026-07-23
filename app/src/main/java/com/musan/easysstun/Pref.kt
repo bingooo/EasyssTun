@@ -38,6 +38,28 @@ class Pref(private val ctx: Context) {
     val localHttpPort: Int
         get() = prefs.getString("local_http_port", (localSocksPort + 1000).toString())?.toIntOrNull() ?: (localSocksPort + 1000)
 
+    var isTailscaleEnabled: Boolean
+        get() = prefs.getBoolean("tailscale_enable", false)
+        set(value) = prefs.edit { putBoolean("tailscale_enable", value) }
+
+    var tailscaleAuthKey: String
+        get() = prefs.getString("tailscale_auth_key", "") ?: ""
+        set(value) = prefs.edit { putString("tailscale_auth_key", value) }
+
+    var tailscaleControlUrl: String
+        get() = prefs.getString("tailscale_control_url", "https://controlplane.tailscale.com") ?: "https://controlplane.tailscale.com"
+        set(value) = prefs.edit { putString("tailscale_control_url", value) }
+
+    var tailscaleHostname: String
+        get() = prefs.getString("tailscale_hostname", "easyss-android") ?: "easyss-android"
+        set(value) = prefs.edit { putString("tailscale_hostname", value) }
+
+    val tailscaleRouterPort: Int
+        get() = prefs.getString("tailscale_router_port", "10800")?.toIntOrNull() ?: 10800
+
+    val easyssSocksPort: Int
+        get() = prefs.getString("easyss_socks_port", "10801")?.toIntOrNull() ?: 10801
+
     fun getApps(): Set<String>? {
         return prefs.getStringSet("selected_apps", HashSet<String>())
     }

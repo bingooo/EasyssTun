@@ -34,16 +34,20 @@ class TProxyService : VpnService() {
     private val easyScope = CoroutineScope(Dispatchers.Default + easyJob)
     private var processEasyJob: Job? = null
     private var v2Process: Process? = null
+    private var startServiceJob: Job? = null
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
         if (ACTION_DISCONNECT == intent.action) {
             stopService()
             return START_NOT_STICKY
         }
-        try {
-            startService()
-        } catch (e: IOException) {
-            throw RuntimeException(e)
+        startServiceJob?.cancel()
+        startServiceJob = easyScope.launch(Dispatchers.IO) {
+            try {
+                startService()
+            } catch (e: IOException) {
+                Log.e("TProxyService", "startService failed: ${e.message}", e)
+            }
         }
         return START_STICKY
     }
@@ -104,7 +108,29 @@ class TProxyService : VpnService() {
             val parts = it.split('/', limit = 2)
             builder.addRoute(parts[0], parts[1].toInt())
         }
-
+        // Dynamically add Headscale approved Subnet Router routes to TUN
+        if (pref.isTailscaleEnabled) {
+            try {
+                val statusPrefs = getSharedPreferences("tailscale_status", Context.MODE_PRIVATE or Context.MODE_MULTI_PROCESS)
+                val subnetsStr = statusPrefs.getString("active_subnets", "") ?: ""
+                if (subnetsStr.isNotEmpty()) {
+                    subnetsStr.split(",").forEach { subnet ->
+                        val trimmed = subnet.trim()
+                        if (trimmed.contains("/")) {
+                            val parts = trimmed.split('/', limit = 2)
+                            try {
+                                builder.addRoute(parts[0], parts[1].toInt())
+                                Log.i("TProxyService", "Added active Subnet route to TUN: $trimmed")
+                            } catch (e: Exception) {
+                                Log.e("TProxyService", "Failed to add route $trimmed: ${e.message}")
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("TProxyService", "Error reading active subnets: ${e.message}")
+            }
+        }
         session += "IPv4"
 
         val appProxyMode = pref.prefs.getString("app_proxy_mode", "bypass") ?: "bypass"
@@ -139,11 +165,17 @@ class TProxyService : VpnService() {
             return
         }
 
+        // Port orchestration for Tailscale and Easyss
+        val isTailscaleEnabled = pref.isTailscaleEnabled
+        val easyssPort = pref.localSocksPort
+        val routerPort = pref.tailscaleRouterPort
+
         // Branching according to coreVersion ("3" -> libeasyss.aar, "2" -> libeasyss.so)
         val isV3 = (easyssInfo.coreVersion == "3")
         if (isV3) {
             val simpleConfig = pref.getSimpleConfig()
             if (simpleConfig != null) {
+                simpleConfig.localPort = easyssPort.toLong()
                 processEasyJob = easyScope.launch {
                     try {
                         val version = Mobile.version()
@@ -161,7 +193,12 @@ class TProxyService : VpnService() {
             processEasyJob = easyScope.launch {
                 try {
                     val libraryPath = applicationInfo.nativeLibraryDir + "/libeasyss.so"
-                    val cmdList = listOf(libraryPath) + easyssInfo.cmdList
+                    val cmdList = mutableListOf(libraryPath)
+                    cmdList.addAll(easyssInfo.cmdList)
+                    val lIdx = cmdList.indexOf("-l")
+                    if (lIdx != -1 && lIdx + 1 < cmdList.size) {
+                        cmdList[lIdx + 1] = easyssPort.toString()
+                    }
                     Log.i("easyss", "Starting Easyss v2 core via ProcessBuilder: $cmdList")
                     val proc = ProcessBuilder(cmdList).directory(cacheDir).redirectErrorStream(true).start()
                     v2Process = proc
@@ -176,6 +213,21 @@ class TProxyService : VpnService() {
                     try { v2Process?.destroy() } catch (e: Exception) {}
                 }
             }
+        }
+
+        // If Tailscale enabled, start tsrouter
+        val targetTProxyPort = if (isTailscaleEnabled) {
+            val success = TailscaleManager.start(
+                context = this,
+                routerPort = routerPort,
+                easyssPort = easyssPort,
+                authKey = pref.tailscaleAuthKey,
+                controlUrl = pref.tailscaleControlUrl,
+                hostname = pref.tailscaleHostname
+            )
+            if (success) routerPort else easyssPort
+        } else {
+            easyssPort
         }
 
         /* TProxy */
@@ -195,7 +247,7 @@ tunnel:
   mtu: 8500
 """
             tproxy_conf += """socks5:
-  port: ${pref.localSocksPort}
+  port: $targetTProxyPort
   address: '127.0.0.1'
   udp: 'udp'
 """
@@ -220,6 +272,13 @@ tunnel:
             TProxyStopService()
         } catch (e: Exception) {
             Log.e("TProxyStopService", e.message.toString())
+        }
+
+        /* Stop Tailscale Manager */
+        try {
+            TailscaleManager.stop()
+        } catch (e: Exception) {
+            Log.e("tailscale", "TailscaleManager.stop error: ${e.message}")
         }
 
         /* Stop Easyss Core */
